@@ -1,0 +1,247 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (session.user.role !== 'BARANGAY') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Get user's barangay
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { barangay: true }
+    })
+
+    if (!user?.barangayId) {
+      return NextResponse.json({ error: 'User not assigned to a barangay' }, { status: 400 })
+    }
+
+    // Get overview statistics
+    const [
+      totalResidents,
+      totalSchedules,
+      totalClaims,
+      upcomingSchedules
+    ] = await Promise.all([
+      prisma.user.count({
+        where: { 
+          barangayId: user.barangayId,
+          role: 'RESIDENT',
+          isActive: true
+        }
+      }),
+      prisma.donationSchedule.count({
+        where: { barangayId: user.barangayId }
+      }),
+      prisma.claim.count({
+        where: {
+          schedule: {
+            barangayId: user.barangayId
+          }
+        }
+      }),
+      prisma.donationSchedule.count({
+        where: {
+          barangayId: user.barangayId,
+          date: { gte: new Date() },
+          status: 'SCHEDULED'
+        }
+      })
+    ])
+
+    // Calculate claim rate
+    const claimRate = totalSchedules > 0 ? Math.round((totalClaims / totalSchedules) * 100) : 0
+
+    // Calculate average attendance
+    const schedulesWithMaxRecipients = await prisma.donationSchedule.findMany({
+      where: {
+        barangayId: user.barangayId,
+        maxRecipients: { not: null }
+      },
+      include: {
+        _count: {
+          select: { claims: true }
+        }
+      }
+    })
+
+    const averageAttendance = schedulesWithMaxRecipients.length > 0
+      ? Math.round(
+          schedulesWithMaxRecipients.reduce((sum, schedule) => {
+            const attendance = schedule.maxRecipients 
+              ? (schedule._count.claims / schedule.maxRecipients) * 100
+              : 0
+            return sum + attendance
+          }, 0) / schedulesWithMaxRecipients.length
+        )
+      : 0
+
+    // Get schedule status distribution
+    const scheduleStats = await prisma.donationSchedule.groupBy({
+      by: ['status'],
+      where: { barangayId: user.barangayId },
+      _count: { status: true }
+    })
+
+    const totalSchedulesForStats = scheduleStats.reduce((sum, stat) => sum + stat._count.status, 0)
+    
+    const scheduleStatusDistribution = scheduleStats.map(stat => ({
+      status: stat.status,
+      count: stat._count.status,
+      percentage: totalSchedulesForStats > 0 
+        ? Math.round((stat._count.status / totalSchedulesForStats) * 100)
+        : 0
+    }))
+
+    // Get recent schedules
+    const recentSchedules = await prisma.donationSchedule.findMany({
+      where: { barangayId: user.barangayId },
+      include: {
+        _count: {
+          select: { claims: true }
+        }
+      },
+      orderBy: { date: 'desc' },
+      take: 5
+    })
+
+    // Get top residents by claims
+    const topResidents = await prisma.user.findMany({
+      where: {
+        barangayId: user.barangayId,
+        role: 'RESIDENT',
+        isActive: true
+      },
+      include: {
+        families: {
+          include: {
+            _count: {
+              select: { claims: true }
+            },
+            claims: {
+              orderBy: { claimedAt: 'desc' },
+              take: 1
+            }
+          }
+        }
+      },
+      take: 5
+    })
+
+    const topResidentsWithClaims = topResidents
+      .map(resident => {
+        const totalClaims = resident.families.reduce((sum, family) => sum + family._count.claims, 0)
+        const lastClaim = resident.families
+          .flatMap(family => family.claims)
+          .sort((a, b) => new Date(b.claimedAt).getTime() - new Date(a.claimedAt).getTime())[0]
+        
+        return {
+          name: `${resident.firstName} ${resident.lastName}`,
+          claims: totalClaims,
+          lastClaim: lastClaim?.claimedAt || resident.createdAt
+        }
+      })
+      .sort((a, b) => b.claims - a.claims)
+
+    // Get monthly trends using Prisma ORM
+    const schedules = await prisma.donationSchedule.findMany({
+      where: {
+        barangayId: user.barangayId,
+        date: {
+          gte: new Date(Date.now() - 12 * 30 * 24 * 60 * 60 * 1000) // 12 months ago
+        }
+      },
+      include: {
+        claims: true
+      }
+    })
+
+    // Group data by month
+    const trendsMap = new Map()
+    
+    schedules.forEach(schedule => {
+      const month = schedule.date.toISOString().slice(0, 7)
+      if (!trendsMap.has(month)) {
+        trendsMap.set(month, {
+          schedules: 0,
+          claims: 0,
+          attendance: 0
+        })
+      }
+      
+      const trend = trendsMap.get(month)
+      trend.schedules += 1
+      trend.claims += schedule.claims.length
+      trend.attendance = schedule.claims.length > 0 ? 100 : 0
+    })
+
+    const monthlyTrends = Array.from(trendsMap.entries()).map(([month, data]) => ({
+      month,
+      schedules: data.schedules,
+      claims: data.claims,
+      attendance: data.attendance
+    })).sort((a, b) => a.month.localeCompare(b.month))
+
+    // Calculate performance metrics
+    const completedSchedules = await prisma.donationSchedule.count({
+      where: {
+        barangayId: user.barangayId,
+        status: 'DISTRIBUTED'
+      }
+    })
+
+    const scheduleCompletion = totalSchedules > 0 ? Math.round((completedSchedules / totalSchedules) * 100) : 0
+    
+    const residentEngagement = totalResidents > 0 
+      ? Math.round((topResidentsWithClaims.filter(r => r.claims > 0).length / totalResidents) * 100)
+      : 0
+
+    const claimEfficiency = totalClaims > 0 
+      ? Math.round((totalClaims / (totalSchedules * 10)) * 100) // Assuming 10 is average expected claims per schedule
+      : 0
+
+    const analytics = {
+      overview: {
+        totalResidents,
+        totalSchedules,
+        totalClaims,
+        upcomingSchedules,
+        claimRate,
+        averageAttendance
+      },
+      scheduleStats: scheduleStatusDistribution,
+      recentSchedules: recentSchedules.map(schedule => ({
+        id: schedule.id,
+        title: schedule.title,
+        date: schedule.date,
+        status: schedule.status,
+        claims: schedule._count.claims,
+        maxRecipients: schedule.maxRecipients
+      })),
+      topResidents: topResidentsWithClaims,
+      monthlyTrends: monthlyTrends || [],
+      performanceMetrics: {
+        scheduleCompletion,
+        residentEngagement,
+        claimEfficiency
+      }
+    }
+
+    return NextResponse.json(analytics)
+  } catch (error) {
+    console.error('Error fetching barangay analytics:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
