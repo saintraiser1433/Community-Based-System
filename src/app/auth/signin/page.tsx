@@ -143,15 +143,6 @@ export default function SignInPage() {
                 </Link>
               </p>
             </div>
-
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Test Accounts:</h3>
-              <div className="text-xs text-gray-600 space-y-1">
-                <p><strong>Admin:</strong> admin@glan.gov.ph / admin123</p>
-                <p><strong>Barangay:</strong> manager1@glan.gov.ph / manager123</p>
-                <p><strong>Resident:</strong> resident1@glan.gov.ph / resident123</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
