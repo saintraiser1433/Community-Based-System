@@ -22,6 +22,14 @@ export default function SignInPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Prevent double submission
+    if (isLoading) {
+      console.log('Already loading, preventing double submission')
+      return
+    }
+    
+    console.log('Starting sign in process...')
     setIsLoading(true)
     setError('')
 
@@ -84,7 +92,7 @@ export default function SignInPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
