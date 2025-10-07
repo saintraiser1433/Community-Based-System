@@ -54,9 +54,7 @@ export default function ResidentDashboard() {
   const [showAddMemberConfirm, setShowAddMemberConfirm] = useState(false)
   const [showEditMemberModal, setShowEditMemberModal] = useState(false)
   const [showDeleteMemberConfirm, setShowDeleteMemberConfirm] = useState(false)
-  const [showClaimConfirm, setShowClaimConfirm] = useState(false)
   const [selectedMember, setSelectedMember] = useState(null)
-  const [selectedClaimSchedule, setSelectedClaimSchedule] = useState(null)
   const [newMember, setNewMember] = useState({
     name: '',
     relation: '',
@@ -113,32 +111,6 @@ export default function ResidentDashboard() {
     }
   }
 
-  const handleClaimDonation = async () => {
-    if (!selectedClaimSchedule) return
-
-    try {
-      const response = await fetch('/api/resident/claim', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ scheduleId: selectedClaimSchedule.id }),
-      })
-
-      if (response.ok) {
-        await fetchDashboardData()
-        setShowClaimConfirm(false)
-        setSelectedClaimSchedule(null)
-        toast.success('Donation claimed successfully!')
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to claim donation')
-      }
-    } catch (error) {
-      console.error('Error claiming donation:', error)
-      toast.error('An error occurred while claiming donation')
-    }
-  }
 
   const openLocationModal = (schedule: any) => {
     setSelectedSchedule(schedule)
@@ -202,10 +174,6 @@ export default function ResidentDashboard() {
     setShowDeleteMemberConfirm(true)
   }
 
-  const openClaimConfirm = (schedule: any) => {
-    setSelectedClaimSchedule(schedule)
-    setShowClaimConfirm(true)
-  }
 
   const handleEditMember = async () => {
     if (!selectedMember) return
@@ -433,15 +401,6 @@ export default function ResidentDashboard() {
                           <Eye className="h-4 w-4 mr-1" />
                           View Location
                         </Button>
-                        {schedule.status === 'SCHEDULED' && (
-                          <Button 
-                            size="sm" 
-                            onClick={() => openClaimConfirm(schedule)}
-                            disabled={schedule.hasClaimed}
-                          >
-                            {schedule.hasClaimed ? 'Already Claimed' : 'Claim'}
-                          </Button>
-                        )}
                         {schedule.hasClaimed && (
                           <Badge variant="outline" className="text-green-600 border-green-600">
                             <CheckCircle className="h-3 w-3 mr-1" />
@@ -462,7 +421,7 @@ export default function ResidentDashboard() {
               <CardHeader>
                 <CardTitle>Donation Schedules</CardTitle>
                 <CardDescription>
-                  View all available donation schedules in your barangay
+                  View all available donation schedules in your barangay. Contact your barangay office to register for donations.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -500,15 +459,6 @@ export default function ResidentDashboard() {
                           <Badge variant={schedule.status === 'SCHEDULED' ? 'default' : 'secondary'}>
                             {schedule.status}
                           </Badge>
-                          {schedule.status === 'SCHEDULED' && (
-                            <Button 
-                              size="sm" 
-                              onClick={() => openClaimConfirm(schedule)}
-                              disabled={schedule.hasClaimed}
-                            >
-                              {schedule.hasClaimed ? 'Already Claimed' : 'Claim Donation'}
-                            </Button>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -628,7 +578,7 @@ export default function ResidentDashboard() {
               <CardHeader>
                 <CardTitle>My Claims</CardTitle>
                 <CardDescription>
-                  View your donation claims and their status
+                  View your donation claims and their status. Claims are verified and processed by barangay officials.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -637,31 +587,88 @@ export default function ResidentDashboard() {
                     <div className="text-center py-8">
                       <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No Claims Yet</h3>
-                      <p className="text-gray-500">You haven't claimed any donations yet. Check the schedules tab to see available donations.</p>
+                      <p className="text-gray-500">You haven't made any donation claims yet. Contact your barangay office to register for available donations.</p>
                     </div>
                   ) : (
                     <>
-                      {getPaginatedData(claims, claimsPage, itemsPerPage).map((claim: any) => (
-                    <div key={claim.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                          <CheckCircle className="h-6 w-6 text-green-500" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold">{claim.schedule?.title}</h3>
-                          <p className="text-sm text-gray-600">
-                            Claimed on {new Date(claim.claimedAt).toLocaleDateString()}
-                          </p>
-                          {claim.notes && (
-                            <p className="text-sm text-gray-500 mt-1">{claim.notes}</p>
-                          )}
-                        </div>
-                      </div>
-                      <Badge variant="default">
-                        {claim.status}
-                      </Badge>
-                    </div>
-                    ))}
+                      {getPaginatedData(claims, claimsPage, itemsPerPage).map((claim: any) => {
+                        const getStatusIcon = (status: string) => {
+                          switch (status) {
+                            case 'PENDING':
+                              return <Clock className="h-6 w-6 text-yellow-500" />
+                            case 'VERIFIED':
+                              return <CheckCircle className="h-6 w-6 text-blue-500" />
+                            case 'CLAIMED':
+                              return <CheckCircle className="h-6 w-6 text-green-500" />
+                            case 'REJECTED':
+                              return <AlertCircle className="h-6 w-6 text-red-500" />
+                            default:
+                              return <Clock className="h-6 w-6 text-gray-500" />
+                          }
+                        }
+
+                        const getStatusColor = (status: string) => {
+                          switch (status) {
+                            case 'PENDING':
+                              return 'bg-yellow-100'
+                            case 'VERIFIED':
+                              return 'bg-blue-100'
+                            case 'CLAIMED':
+                              return 'bg-green-100'
+                            case 'REJECTED':
+                              return 'bg-red-100'
+                            default:
+                              return 'bg-gray-100'
+                          }
+                        }
+
+                        const getStatusBadgeVariant = (status: string) => {
+                          switch (status) {
+                            case 'PENDING':
+                              return 'secondary'
+                            case 'VERIFIED':
+                              return 'default'
+                            case 'CLAIMED':
+                              return 'default'
+                            case 'REJECTED':
+                              return 'destructive'
+                            default:
+                              return 'secondary'
+                          }
+                        }
+
+                        return (
+                          <div key={claim.id} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center space-x-4">
+                              <div className={`w-12 h-12 ${getStatusColor(claim.status)} rounded-full flex items-center justify-center`}>
+                                {getStatusIcon(claim.status)}
+                              </div>
+                              <div>
+                                <h3 className="font-semibold">{claim.schedule?.title}</h3>
+                                <p className="text-sm text-gray-600">
+                                  Claimed on {new Date(claim.claimedAt).toLocaleDateString()}
+                                </p>
+                                {claim.verifiedAt && (
+                                  <p className="text-sm text-gray-500">
+                                    Verified on {new Date(claim.verifiedAt).toLocaleDateString()}
+                                  </p>
+                                )}
+                                {claim.claimedAtPhysical && (
+                                  <p className="text-sm text-gray-500">
+                                    Physically claimed on {new Date(claim.claimedAtPhysical).toLocaleDateString()}
+                                  </p>
+                                )}
+                                {claim.notes && (
+                                  <p className="text-sm text-gray-500 mt-1">{claim.notes}</p>
+                                )}
+                              </div>
+                            </div>
+                            <Badge variant={getStatusBadgeVariant(claim.status)}>
+                              {claim.status}
+                            </Badge>
+                          </div>
+                        )
+                      })}
                     
                     {claims.length > itemsPerPage && (
                       <div className="mt-6">
@@ -917,16 +924,6 @@ export default function ResidentDashboard() {
         title="Remove Family Member"
         description={`Are you sure you want to remove "${selectedMember?.name}" from your family? This action cannot be undone.`}
         action="delete"
-      />
-
-      {/* Claim Donation Confirmation Dialog */}
-      <ConfirmationDialog
-        open={showClaimConfirm}
-        onOpenChange={setShowClaimConfirm}
-        onConfirm={handleClaimDonation}
-        title="Claim Donation"
-        description={`Are you sure you want to claim the donation for "${selectedClaimSchedule?.title}"? This action cannot be undone.`}
-        action="create"
       />
     </div>
   )

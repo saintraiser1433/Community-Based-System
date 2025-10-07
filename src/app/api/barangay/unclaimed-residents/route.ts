@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendClaimReminderNotification } from '@/lib/notifications'
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
@@ -16,7 +15,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { scheduleId } = await request.json()
+    const { searchParams } = new URL(request.url)
+    const scheduleId = searchParams.get('scheduleId')
 
     if (!scheduleId) {
       return NextResponse.json({ error: 'Schedule ID is required' }, { status: 400 })
@@ -44,31 +44,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
     }
 
-    // Send reminder notifications
-    const reminderResult = await sendClaimReminderNotification(scheduleId, user.barangayId)
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: 'REMINDER_SENT',
-        details: `Sent reminder notifications for schedule: ${schedule.title}`
+    // Get residents who haven't claimed this schedule
+    const unclaimedResidents = await prisma.user.findMany({
+      where: {
+        barangayId: user.barangayId,
+        role: 'RESIDENT',
+        isActive: true,
+        families: {
+          some: {
+            claims: {
+              none: {
+                scheduleId: scheduleId
+              }
+            }
+          }
+        }
+      },
+      include: {
+        families: {
+          include: {
+            members: true
+          }
+        }
+      },
+      orderBy: {
+        firstName: 'asc'
       }
     })
 
-    return NextResponse.json({
-      success: reminderResult.success,
-      message: reminderResult.success 
-        ? `Reminder sent to ${reminderResult.sentCount} residents`
-        : 'Failed to send reminders',
-      details: reminderResult
-    })
-
+    return NextResponse.json(unclaimedResidents)
   } catch (error) {
-    console.error('Error sending reminders:', error)
+    console.error('Error fetching unclaimed residents:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
   }
 }
+

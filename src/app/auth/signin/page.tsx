@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { signIn, getSession } from 'next-auth/react'
+import { useState, useEffect } from 'react'
+import { signIn, getSession, useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,28 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
+  const { data: session, status } = useSession()
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      console.log('Session authenticated, redirecting to:', session.user.role)
+      setIsLoading(false) // Reset loading state
+      switch (session.user.role) {
+        case 'ADMIN':
+          router.push('/admin/dashboard')
+          break
+        case 'BARANGAY':
+          router.push('/barangay/dashboard')
+          break
+        case 'RESIDENT':
+          router.push('/resident/dashboard')
+          break
+        default:
+          router.push('/')
+      }
+    }
+  }, [session, status, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,30 +64,32 @@ export default function SignInPage() {
 
       if (result?.error) {
         setError('Invalid email or password')
-      } else {
-        const session = await getSession()
-        if (session?.user) {
-          // Redirect based on user role
-          switch (session.user.role) {
-            case 'ADMIN':
-              router.push('/admin/dashboard')
-              break
-            case 'BARANGAY':
-              router.push('/barangay/dashboard')
-              break
-            case 'RESIDENT':
-              router.push('/resident/dashboard')
-              break
-            default:
-              router.push('/')
-          }
-        }
+        setIsLoading(false)
+        return
       }
+
+      // The useEffect will handle the redirect when session is updated
+      console.log('Sign in successful, waiting for session update...')
+      
     } catch (error) {
+      console.error('Login error:', error)
       setError('An error occurred. Please try again.')
-    } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show loading state when session is being processed
+  if (status === 'loading' || isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {isLoading ? 'Signing in...' : 'Loading...'}
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (

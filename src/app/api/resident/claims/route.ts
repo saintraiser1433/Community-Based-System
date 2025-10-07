@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
         familyId: family.id
       },
       include: {
-        schedule: true
+        schedule: true,
+        verifiedByUser: true
       },
       orderBy: {
         claimedAt: 'desc'

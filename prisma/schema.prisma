@@ -23,6 +23,13 @@ enum DonationStatus {
   CANCELLED
 }
 
+enum ClaimStatus {
+  PENDING
+  VERIFIED
+  CLAIMED
+  REJECTED
+}
+
 enum FamilyMemberRelation {
   SPOUSE
   CHILD
@@ -49,6 +56,7 @@ model User {
   idFilePath String?   // Path to uploaded ID file
   families   Family[]
   claims     Claim[] @relation("ClaimedByUser")
+  verifiedClaims Claim[] @relation("VerifiedByUser")
 
   // Barangay specific fields
   managedBarangay Barangay? @relation("BarangayManager")
@@ -143,11 +151,14 @@ model Claim {
   claimedByUser User        @relation("ClaimedByUser", fields: [claimedBy], references: [id])
   barangayId String
   barangay   Barangay       @relation(fields: [barangayId], references: [id])
-  status     DonationStatus @default(CLAIMED)
+  status     ClaimStatus    @default(PENDING)
   isVerified Boolean        @default(false)
   claimedAt  DateTime       @default(now())
   verifiedAt DateTime?
+  claimedAtPhysical DateTime?
   notes      String?
+  verifiedBy String?
+  verifiedByUser User?      @relation("VerifiedByUser", fields: [verifiedBy], references: [id])
 
   @@unique([familyId, scheduleId])
   @@map("claims")

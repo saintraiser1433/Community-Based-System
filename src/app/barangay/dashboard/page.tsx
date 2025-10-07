@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Home, 
   Calendar, 
@@ -24,7 +25,7 @@ import {
   Eye,
   Edit,
   Trash2,
-  Bell
+  X
 } from 'lucide-react'
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -51,14 +52,21 @@ export default function BarangayDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateSchedule, setShowCreateSchedule] = useState(false)
   const [showEditSchedule, setShowEditSchedule] = useState(false)
-  const [selectedSchedule, setSelectedSchedule] = useState(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [selectedSchedule, setSelectedSchedule] = useState<any>(null)
   const [showDistributedConfirm, setShowDistributedConfirm] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
-  const [showVerifyConfirm, setShowVerifyConfirm] = useState(false)
-  const [selectedClaim, setSelectedClaim] = useState(null)
+  const [showClaimConfirm, setShowClaimConfirm] = useState(false)
+  const [selectedClaim, setSelectedClaim] = useState<any>(null)
+  const [claimNotes, setClaimNotes] = useState('')
   const [showResidentDetails, setShowResidentDetails] = useState(false)
-  const [selectedResident, setSelectedResident] = useState(null)
+  const [selectedResident, setSelectedResident] = useState<any>(null)
+  const [showUnclaimedResidents, setShowUnclaimedResidents] = useState(false)
+  const [selectedScheduleForClaim, setSelectedScheduleForClaim] = useState<any>(null)
+  const [unclaimedResidents, setUnclaimedResidents] = useState<any[]>([])
+  const [showFamilyMemberSelect, setShowFamilyMemberSelect] = useState(false)
+  const [selectedResidentForClaim, setSelectedResidentForClaim] = useState<any>(null)
+  const [selectedFamilyMember, setSelectedFamilyMember] = useState<string | null>(null)
+  const [unclaimedResidentsPage, setUnclaimedResidentsPage] = useState(1)
   const [loading, setLoading] = useState(false)
   
   // Pagination states
@@ -225,37 +233,6 @@ export default function BarangayDashboard() {
     }
   }
 
-  const openDeleteConfirm = (schedule: any) => {
-    setSelectedSchedule(schedule)
-    setShowDeleteConfirm(true)
-  }
-
-  const confirmDeleteSchedule = async () => {
-    if (!selectedSchedule) return
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/barangay/schedules/${selectedSchedule.id}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        await fetchDashboardData()
-        toast.success('Schedule deleted successfully')
-        setShowDeleteConfirm(false)
-        setSelectedSchedule(null)
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to delete schedule')
-      }
-    } catch (error) {
-      console.error('Error deleting schedule:', error)
-      toast.error('An error occurred while deleting schedule')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const openDistributedConfirm = (schedule: any) => {
     setSelectedSchedule(schedule)
     setShowDistributedConfirm(true)
@@ -322,36 +299,8 @@ export default function BarangayDashboard() {
     }
   }
 
-  const sendReminder = async (scheduleId: string) => {
-    setLoading(true)
-    try {
-      const response = await fetch('/api/barangay/send-reminders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduleId })
-      })
 
-      if (response.ok) {
-        const result = await response.json()
-        toast.success(result.message || 'Reminder sent successfully')
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to send reminder')
-      }
-    } catch (error) {
-      console.error('Error sending reminder:', error)
-      toast.error('An error occurred while sending reminder')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const openVerifyConfirm = (claim: any) => {
-    setSelectedClaim(claim)
-    setShowVerifyConfirm(true)
-  }
-
-  const confirmVerifyClaim = async () => {
+  const confirmClaimDonation = async () => {
     if (!selectedClaim) return
 
     setLoading(true)
@@ -359,29 +308,110 @@ export default function BarangayDashboard() {
       const response = await fetch(`/api/barangay/claims/${selectedClaim.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isVerified: true })
+        body: JSON.stringify({ action: 'claim', notes: claimNotes })
       })
 
       if (response.ok) {
         await fetchDashboardData()
-        toast.success('Claim verified successfully')
-        setShowVerifyConfirm(false)
+        toast.success('Donation marked as claimed successfully')
+        setShowClaimConfirm(false)
         setSelectedClaim(null)
+        setClaimNotes('')
       } else {
         const error = await response.json()
-        toast.error(error.error || 'Failed to verify claim')
+        toast.error(error.error || 'Failed to mark claim as completed')
       }
     } catch (error) {
-      console.error('Error verifying claim:', error)
-      toast.error('An error occurred while verifying claim')
+      console.error('Error marking claim as completed:', error)
+      toast.error('An error occurred while marking claim as completed')
     } finally {
       setLoading(false)
     }
   }
 
+  const openClaimConfirm = (claim: any) => {
+    setSelectedClaim(claim)
+    setShowClaimConfirm(true)
+  }
+
+
   const openResidentDetails = (resident: any) => {
     setSelectedResident(resident)
     setShowResidentDetails(true)
+  }
+
+  const openUnclaimedResidents = async (schedule: any) => {
+    setSelectedScheduleForClaim(schedule)
+    setUnclaimedResidentsPage(1) // Reset pagination to first page
+    setLoading(true)
+    
+    try {
+      // Fetch residents who haven't claimed this schedule
+      const response = await fetch(`/api/barangay/unclaimed-residents?scheduleId=${schedule.id}`)
+      if (response.ok) {
+        const residents = await response.json()
+        setUnclaimedResidents(residents)
+        setShowUnclaimedResidents(true)
+      } else {
+        toast.error('Failed to fetch unclaimed residents')
+      }
+    } catch (error) {
+      console.error('Error fetching unclaimed residents:', error)
+      toast.error('An error occurred while fetching residents')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const openFamilyMemberSelect = (resident: any) => {
+    setSelectedResidentForClaim(resident)
+    setShowFamilyMemberSelect(true)
+  }
+
+  const handleClaimForResident = async (resident: any, familyMemberId?: string, familyMemberName?: string) => {
+    if (!selectedScheduleForClaim) return
+
+    setLoading(true)
+    try {
+      const requestBody: any = {
+        scheduleId: selectedScheduleForClaim.id,
+        residentId: resident.id
+      }
+
+      if (familyMemberId && familyMemberName) {
+        requestBody.familyMemberId = familyMemberId
+        requestBody.familyMemberName = familyMemberName
+      }
+
+      const response = await fetch('/api/barangay/claim-for-resident', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast.success(`Successfully claimed donation for ${result.resident.name}`)
+        
+        // Refresh the unclaimed residents list
+        await openUnclaimedResidents(selectedScheduleForClaim)
+        
+        // Close family member select if open
+        setShowFamilyMemberSelect(false)
+        setSelectedResidentForClaim(null)
+        setSelectedFamilyMember(null)
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to claim donation for resident')
+      }
+    } catch (error) {
+      console.error('Error claiming donation for resident:', error)
+      toast.error('An error occurred while claiming donation')
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Pagination helper functions
@@ -871,7 +901,7 @@ export default function BarangayDashboard() {
                         {schedule.status === 'SCHEDULED' && (
                           <div className="flex flex-col sm:flex-row gap-2 lg:ml-4">
                             {/* Mobile: Stack buttons vertically */}
-                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2">
                               <Button 
                                 variant="outline" 
                                 size="sm" 
@@ -880,15 +910,6 @@ export default function BarangayDashboard() {
                               >
                                 <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                                 <span className="hidden sm:inline">Edit</span>
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => openDeleteConfirm(schedule)}
-                                className="text-red-600 hover:text-red-700 text-xs sm:text-sm"
-                              >
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                                <span className="hidden sm:inline">Delete</span>
                               </Button>
                               <Button 
                                 variant="outline" 
@@ -907,19 +928,18 @@ export default function BarangayDashboard() {
                               >
                                 <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                                 <span className="hidden sm:inline">Cancel</span>
-                          </Button>
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => openUnclaimedResidents(schedule)}
+                                className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm"
+                              >
+                                <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                <span className="hidden sm:inline">Manage Claims</span>
+                              </Button>
                         </div>
                             
-                            {/* Reminder button - full width on mobile */}
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => sendReminder(schedule.id)}
-                              className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm w-full sm:w-auto"
-                            >
-                              <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                              Send Reminder
-                            </Button>
                           </div>
                         )}
                       </div>
@@ -962,42 +982,102 @@ export default function BarangayDashboard() {
                     </div>
                   ) : (
                     <>
-                      {getPaginatedData(claims, claimsPage, itemsPerPage).map((claim: any) => (
-                    <div key={claim.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                          <CheckCircle className="h-6 w-6 text-green-500" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold">{claim.schedule?.title}</h3>
-                          <p className="text-sm text-gray-600">
-                            Claimed by: {claim.claimedByUser?.firstName} {claim.claimedByUser?.lastName}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {new Date(claim.claimedAt).toLocaleDateString()} at {new Date(claim.claimedAt).toLocaleTimeString()}
-                          </p>
-                          {claim.notes && (
-                            <p className="text-sm text-gray-500 mt-1">{claim.notes}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={claim.isVerified ? 'default' : 'secondary'}>
-                          {claim.isVerified ? 'VERIFIED' : claim.status}
-                        </Badge>
-                        {!claim.isVerified && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => openVerifyConfirm(claim)}
-                          >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Verify
-                        </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                      {getPaginatedData(claims, claimsPage, itemsPerPage).map((claim: any) => {
+                        const getStatusIcon = (status: string) => {
+                          switch (status) {
+                            case 'PENDING':
+                              return <Clock className="h-6 w-6 text-yellow-500" />
+                            case 'VERIFIED':
+                              return <CheckCircle className="h-6 w-6 text-blue-500" />
+                            case 'CLAIMED':
+                              return <CheckCircle className="h-6 w-6 text-green-500" />
+                            case 'REJECTED':
+                              return <AlertCircle className="h-6 w-6 text-red-500" />
+                            default:
+                              return <Clock className="h-6 w-6 text-gray-500" />
+                          }
+                        }
+
+                        const getStatusColor = (status: string) => {
+                          switch (status) {
+                            case 'PENDING':
+                              return 'bg-yellow-100'
+                            case 'VERIFIED':
+                              return 'bg-blue-100'
+                            case 'CLAIMED':
+                              return 'bg-green-100'
+                            case 'REJECTED':
+                              return 'bg-red-100'
+                            default:
+                              return 'bg-gray-100'
+                          }
+                        }
+
+                        const getStatusBadgeVariant = (status: string) => {
+                          switch (status) {
+                            case 'PENDING':
+                              return 'secondary'
+                            case 'VERIFIED':
+                              return 'default'
+                            case 'CLAIMED':
+                              return 'default'
+                            case 'REJECTED':
+                              return 'destructive'
+                            default:
+                              return 'secondary'
+                          }
+                        }
+
+                        return (
+                          <div key={claim.id} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center space-x-4">
+                              <div className={`w-12 h-12 ${getStatusColor(claim.status)} rounded-full flex items-center justify-center`}>
+                                {getStatusIcon(claim.status)}
+                              </div>
+                              <div>
+                                <h3 className="font-semibold">{claim.schedule?.title}</h3>
+                                <p className="text-sm text-gray-600">
+                                  Claimed by: {claim.claimedByUser?.firstName} {claim.claimedByUser?.lastName}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  Family: {claim.family?.head?.firstName} {claim.family?.head?.lastName}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {new Date(claim.claimedAt).toLocaleDateString()} at {new Date(claim.claimedAt).toLocaleTimeString()}
+                                </p>
+                                {claim.verifiedAt && (
+                                  <p className="text-sm text-gray-500">
+                                    Verified on {new Date(claim.verifiedAt).toLocaleDateString()}
+                                  </p>
+                                )}
+                                {claim.claimedAtPhysical && (
+                                  <p className="text-sm text-gray-500">
+                                    Physically claimed on {new Date(claim.claimedAtPhysical).toLocaleDateString()}
+                                  </p>
+                                )}
+                                {claim.notes && (
+                                  <p className="text-sm text-gray-500 mt-1">{claim.notes}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={getStatusBadgeVariant(claim.status)}>
+                                {claim.status}
+                              </Badge>
+                              {claim.status === 'VERIFIED' && (
+                                <Button 
+                                  variant="default" 
+                                  size="sm" 
+                                  onClick={() => openClaimConfirm(claim)}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Mark as Claimed
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
                       
                       {claims.length > itemsPerPage && (
                         <div className="mt-6">
@@ -1087,17 +1167,6 @@ export default function BarangayDashboard() {
         </Tabs>
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-        onConfirm={confirmDeleteSchedule}
-        title="Delete Schedule"
-        description={`Are you sure you want to delete the schedule "${selectedSchedule?.title}"? This action cannot be undone.`}
-        action="delete"
-        loading={loading}
-      />
-
       {/* Mark as Distributed Confirmation Dialog */}
       <ConfirmationDialog
         open={showDistributedConfirm}
@@ -1120,29 +1189,49 @@ export default function BarangayDashboard() {
         loading={loading}
       />
 
-      {/* Verify Claim Confirmation Dialog */}
-      <ConfirmationDialog
-        open={showVerifyConfirm}
-        onOpenChange={setShowVerifyConfirm}
-        onConfirm={confirmVerifyClaim}
-        title="Verify Claim"
-        description={`Are you sure you want to verify the claim for "${selectedClaim?.schedule?.title}" by ${selectedClaim?.claimedByUser?.firstName} ${selectedClaim?.claimedByUser?.lastName}? This will mark the claim as verified.`}
-        action="update"
-        loading={loading}
-      />
+      {/* Mark as Claimed Confirmation Dialog */}
+      <Dialog open={showClaimConfirm} onOpenChange={setShowClaimConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark as Claimed</DialogTitle>
+            <DialogDescription>
+              Mark the donation as physically claimed for "{selectedClaim?.schedule?.title}" by {selectedClaim?.claimedByUser?.firstName} {selectedClaim?.claimedByUser?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="claim-notes">Notes (Optional)</Label>
+              <Textarea
+                id="claim-notes"
+                placeholder="Add any notes about the physical claim..."
+                value={claimNotes}
+                onChange={(e) => setClaimNotes(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowClaimConfirm(false)}>
+                Cancel
+              </Button>
+              <Button onClick={confirmClaimDonation} disabled={loading}>
+                {loading ? 'Processing...' : 'Mark as Claimed'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Resident Details Dialog */}
       <Dialog open={showResidentDetails} onOpenChange={setShowResidentDetails}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto sm:w-full">
           <DialogHeader>
-            <DialogTitle>Resident Details</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Resident Details</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
               View detailed information about this resident
             </DialogDescription>
           </DialogHeader>
           {selectedResident && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">First Name</Label>
                   <p className="text-sm">{selectedResident.firstName}</p>
@@ -1153,10 +1242,10 @@ export default function BarangayDashboard() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Email</Label>
-                  <p className="text-sm">{selectedResident.email}</p>
+                  <p className="text-sm break-all">{selectedResident.email}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Phone</Label>
@@ -1164,7 +1253,7 @@ export default function BarangayDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Status</Label>
                   <Badge variant={selectedResident.isActive ? 'default' : 'secondary'}>
@@ -1284,6 +1373,151 @@ export default function BarangayDashboard() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Unclaimed Residents Modal */}
+      <Dialog open={showUnclaimedResidents} onOpenChange={setShowUnclaimedResidents}>
+        <DialogContent className="w-[99vw] max-w-[95vw] max-h-[90vh] overflow-y-auto sm:w-full">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl">Manage Claims - {selectedScheduleForClaim?.title}</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              Select residents to claim donations on their behalf. You can choose family members if the resident is not available.
+              {unclaimedResidents.length > 0 && (
+                <span className="block mt-2 text-blue-600 font-medium">
+                  {unclaimedResidents.length} resident{unclaimedResidents.length !== 1 ? 's' : ''} available
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {unclaimedResidents.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">All Residents Have Claimed</h3>
+                <p className="text-gray-500">All residents in your barangay have already claimed this donation.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-4 sm:gap-6">
+                  {getPaginatedData(unclaimedResidents, unclaimedResidentsPage, 10).map((resident: any) => (
+                    <div key={resident.id} className="border rounded-lg p-4 sm:p-6">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-base">{resident.firstName} {resident.lastName}</h4>
+                          {resident.families?.[0]?.members?.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {resident.families[0].members.length} Family Members
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-sm text-gray-600 break-all">{resident.email}</p>
+                            <p className="text-xs text-gray-500">Email</p>
+                          </div>
+                          {resident.phone && (
+                            <div>
+                              <p className="text-sm text-gray-600">{resident.phone}</p>
+                              <p className="text-xs text-gray-500">Phone</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleClaimForResident(resident)}
+                            disabled={loading}
+                            className="w-full sm:flex-1 text-sm"
+                          >
+                            Claim for Resident
+                          </Button>
+                          {resident.families?.[0]?.members?.length > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openFamilyMemberSelect(resident)}
+                              disabled={loading}
+                              className="w-full sm:flex-1 text-sm"
+                            >
+                              Claim for Family Member
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Pagination */}
+                {unclaimedResidents.length > 10 && (
+                  <div className="flex justify-center mt-6">
+                    <Pagination
+                      currentPage={unclaimedResidentsPage}
+                      totalItems={unclaimedResidents.length}
+                      itemsPerPage={10}
+                      totalPages={Math.ceil(unclaimedResidents.length / 10)}
+                      onPageChange={setUnclaimedResidentsPage}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Family Member Selection Modal */}
+      <Dialog open={showFamilyMemberSelect} onOpenChange={setShowFamilyMemberSelect}>
+        <DialogContent className="w-[95vw] max-w-md sm:w-full">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl">Select Family Member</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              Choose which family member will claim the donation for {selectedResidentForClaim?.firstName} {selectedResidentForClaim?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm sm:text-base">Select Family Member:</Label>
+              <Select value={selectedFamilyMember || ''} onValueChange={setSelectedFamilyMember}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select family member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedResidentForClaim?.families?.[0]?.members?.map((member: any) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name} ({member.relation})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end sm:space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowFamilyMemberSelect(false)}
+                className="w-full sm:w-auto order-2 sm:order-1"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (selectedFamilyMember && selectedResidentForClaim) {
+                    const member = selectedResidentForClaim.families[0].members.find((m: any) => m.id === selectedFamilyMember)
+                    if (member) {
+                      handleClaimForResident(selectedResidentForClaim, selectedFamilyMember, member.name)
+                    }
+                  }
+                }}
+                disabled={!selectedFamilyMember || loading}
+                className="w-full sm:w-auto order-1 sm:order-2"
+              >
+                {loading ? 'Processing...' : 'Claim for Family Member'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

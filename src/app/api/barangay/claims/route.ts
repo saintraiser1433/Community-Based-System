@@ -34,10 +34,12 @@ export async function GET(request: NextRequest) {
         schedule: true,
         family: {
           include: {
-            head: true
+            head: true,
+            members: true
           }
         },
-        claimedByUser: true
+        claimedByUser: true,
+        verifiedByUser: true
       },
       orderBy: {
         claimedAt: 'desc'

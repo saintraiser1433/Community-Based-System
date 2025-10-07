@@ -19,7 +19,7 @@ export async function PUT(
     }
 
     const { id } = await params
-    const { isVerified } = await request.json()
+    const { action, notes } = await request.json() // action: 'verify' | 'claim' | 'reject'
 
     // Get user's barangay
     const user = await prisma.user.findUnique({
@@ -39,7 +39,12 @@ export async function PUT(
       },
       include: {
         schedule: true,
-        claimedByUser: true
+        claimedByUser: true,
+        family: {
+          include: {
+            head: true
+          }
+        }
       }
     })
 
@@ -47,25 +52,81 @@ export async function PUT(
       return NextResponse.json({ error: 'Claim not found' }, { status: 404 })
     }
 
-    // Update the claim verification status
-    const claim = await prisma.claim.update({
-      where: { id },
-      data: { 
-        isVerified,
-        verifiedAt: isVerified ? new Date() : null
-      }
-    })
+    let updatedClaim
+    let auditAction = ''
+    let auditDetails = ''
+
+    switch (action) {
+      case 'verify':
+        if (existingClaim.status !== 'PENDING') {
+          return NextResponse.json({ error: 'Only pending claims can be verified' }, { status: 400 })
+        }
+        
+        updatedClaim = await prisma.claim.update({
+          where: { id },
+          data: { 
+            status: 'VERIFIED',
+            isVerified: true,
+            verifiedAt: new Date(),
+            verifiedBy: session.user.id,
+            notes: notes || existingClaim.notes
+          }
+        })
+        
+        auditAction = 'CLAIM_VERIFIED'
+        auditDetails = `Verified claim for ${existingClaim.schedule.title} by ${existingClaim.claimedByUser.firstName} ${existingClaim.claimedByUser.lastName}`
+        break
+
+      case 'claim':
+        if (existingClaim.status !== 'VERIFIED') {
+          return NextResponse.json({ error: 'Only verified claims can be marked as claimed' }, { status: 400 })
+        }
+        
+        updatedClaim = await prisma.claim.update({
+          where: { id },
+          data: { 
+            status: 'CLAIMED',
+            claimedAtPhysical: new Date(),
+            notes: notes || existingClaim.notes
+          }
+        })
+        
+        auditAction = 'CLAIM_COMPLETED'
+        auditDetails = `Marked claim as physically claimed for ${existingClaim.schedule.title} by ${existingClaim.claimedByUser.firstName} ${existingClaim.claimedByUser.lastName}`
+        break
+
+      case 'reject':
+        if (existingClaim.status !== 'PENDING') {
+          return NextResponse.json({ error: 'Only pending claims can be rejected' }, { status: 400 })
+        }
+        
+        updatedClaim = await prisma.claim.update({
+          where: { id },
+          data: { 
+            status: 'REJECTED',
+            verifiedBy: session.user.id,
+            notes: notes || existingClaim.notes
+          }
+        })
+        
+        auditAction = 'CLAIM_REJECTED'
+        auditDetails = `Rejected claim for ${existingClaim.schedule.title} by ${existingClaim.claimedByUser.firstName} ${existingClaim.claimedByUser.lastName}`
+        break
+
+      default:
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
 
     // Create audit log
     await prisma.auditLog.create({
       data: {
         userId: session.user.id,
-        action: 'CLAIM_VERIFIED',
-        details: `Verified claim for ${existingClaim.schedule.title} by ${existingClaim.claimedByUser.firstName} ${existingClaim.claimedByUser.lastName}`
+        action: auditAction,
+        details: auditDetails
       }
     })
 
-    return NextResponse.json({ message: 'Claim updated successfully', claim })
+    return NextResponse.json({ message: 'Claim updated successfully', claim: updatedClaim })
   } catch (error) {
     console.error('Error updating claim:', error)
     return NextResponse.json(
