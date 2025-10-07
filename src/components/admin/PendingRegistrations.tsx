@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { CheckCircle, XCircle, User, MapPin, Calendar, Mail, Phone, Eye, FileText } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import Pagination from '@/components/ui/pagination'
 import toast from 'react-hot-toast'
 
 interface PendingRegistration {
@@ -33,6 +34,10 @@ export default function PendingRegistrations() {
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedRegistration, setSelectedRegistration] = useState<PendingRegistration | null>(null)
   const [loading, setLoading] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
 
   useEffect(() => {
     fetchPendingRegistrations()
@@ -51,6 +56,17 @@ export default function PendingRegistrations() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Pagination helper functions
+  const getPaginatedData = (data: PendingRegistration[], page: number, itemsPerPage: number) => {
+    const startIndex = (page - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return data.slice(startIndex, endIndex)
+  }
+
+  const getTotalPages = (data: PendingRegistration[], itemsPerPage: number) => {
+    return Math.ceil(data.length / itemsPerPage)
   }
 
   const openApproveConfirm = (registration: PendingRegistration) => {
@@ -155,7 +171,7 @@ export default function PendingRegistrations() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {registrations.map((registration) => (
+                {getPaginatedData(registrations, currentPage, itemsPerPage).map((registration) => (
                   <TableRow key={registration.id}>
                     <TableCell>
                       <div className="flex items-center space-x-3">
@@ -238,6 +254,18 @@ export default function PendingRegistrations() {
                 ))}
               </TableBody>
             </Table>
+            
+            {registrations.length > itemsPerPage && (
+              <div className="mt-6">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={getTotalPages(registrations, itemsPerPage)}
+                  onPageChange={setCurrentPage}
+                  totalItems={registrations.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            )}
           )}
         </CardContent>
       </Card>
