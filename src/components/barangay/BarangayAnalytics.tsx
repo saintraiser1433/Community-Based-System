@@ -58,6 +58,7 @@ interface BarangayAnalytics {
     maxRecipients: number | null
   }>
   topResidents: Array<{
+    id: string
     name: string
     claims: number
     lastClaim: string
@@ -95,10 +96,19 @@ export default function BarangayAnalytics() {
   const fetchAnalytics = async () => {
     setIsLoading(true)
     try {
+      console.log('Fetching barangay analytics...')
       const response = await fetch('/api/barangay/analytics')
+      console.log('Analytics response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('Analytics data received:', data)
         setAnalytics(data)
+      } else {
+        const errorData = await response.json()
+        console.error('Analytics API error:', errorData)
+        console.error('Response status:', response.status)
+        console.error('Response headers:', response.headers)
       }
     } catch (error) {
       console.error('Error fetching analytics:', error)
@@ -118,12 +128,15 @@ export default function BarangayAnalytics() {
     )
   }
 
-  if (!analytics) {
+  if (!analytics || !analytics.overview) {
     return (
       <div className="text-center py-8">
         <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-gray-900 mb-2">No Analytics Data</h3>
         <p className="text-gray-600">Analytics data is not available yet.</p>
+        <div className="mt-4 text-sm text-gray-500">
+          <p>Debug info: {analytics ? 'Analytics object exists but missing overview' : 'No analytics object'}</p>
+        </div>
       </div>
     )
   }
@@ -388,7 +401,7 @@ export default function BarangayAnalytics() {
           <CardContent>
             <div className="space-y-4">
               {analytics.topResidents.map((resident, index) => (
-                <div key={resident.name} className="flex items-center justify-between">
+                <div key={resident.id} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center">
                       <span className="text-sm font-bold text-pink-600">#{index + 1}</span>
