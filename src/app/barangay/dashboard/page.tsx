@@ -23,7 +23,8 @@ import {
   BarChart3,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  Bell
 } from 'lucide-react'
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -307,6 +308,30 @@ export default function BarangayDashboard() {
     } catch (error) {
       console.error('Error cancelling schedule:', error)
       toast.error('An error occurred while cancelling schedule')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const sendReminder = async (scheduleId: string) => {
+    setLoading(true)
+    try {
+      const response = await fetch('/api/barangay/send-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduleId })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast.success(result.message || 'Reminder sent successfully')
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to send reminder')
+      }
+    } catch (error) {
+      console.error('Error sending reminder:', error)
+      toast.error('An error occurred while sending reminder')
     } finally {
       setLoading(false)
     }
@@ -860,7 +885,16 @@ export default function BarangayDashboard() {
                               >
                                 <AlertCircle className="h-4 w-4 mr-2" />
                                 Cancel
-                          </Button>
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => sendReminder(schedule.id)}
+                                className="text-blue-600 hover:text-blue-700"
+                              >
+                                <Bell className="h-4 w-4 mr-2" />
+                                Send Reminder
+                              </Button>
                             </>
                           )}
                         </div>

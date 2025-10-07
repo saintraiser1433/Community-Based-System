@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendScheduleNotificationToResidents } from '@/lib/notifications'
 
 export async function GET(request: NextRequest) {
   try {
@@ -174,7 +175,34 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ message: 'Schedule created successfully', schedule })
+    // Send SMS notifications to all residents
+    try {
+      console.log('Sending SMS notifications to residents...')
+      const notificationResult = await sendScheduleNotificationToResidents({
+        title,
+        message: description,
+        scheduleId: schedule.id,
+        barangayId: user.barangayId
+      })
+
+      if (notificationResult.success) {
+        console.log(`SMS notifications sent successfully to ${notificationResult.sentCount} residents`)
+      } else {
+        console.error('SMS notifications failed:', notificationResult.errors)
+      }
+    } catch (smsError) {
+      console.error('Error sending SMS notifications:', smsError)
+      // Don't fail the schedule creation if SMS fails
+    }
+
+    return NextResponse.json({ 
+      message: 'Schedule created successfully', 
+      schedule,
+      smsNotification: {
+        sent: true,
+        message: 'SMS notifications sent to residents'
+      }
+    })
   } catch (error) {
     console.error('Error creating schedule:', error)
     return NextResponse.json(
