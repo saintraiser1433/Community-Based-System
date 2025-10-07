@@ -226,3 +226,14 @@ model VerificationToken {
   @@unique([identifier, token])
   @@map("verification_tokens")
 }
+
+model SMSSettings {
+  id       String   @id @default(cuid())
+  username String
+  password String
+  isActive Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sms_settings")
+}

@@ -25,7 +25,8 @@ import {
   Trash2,
   Eye,
   Search,
-  Database
+  Database,
+  Smartphone
 } from 'lucide-react'
 import Image from 'next/image'
 import { ReportGenerator } from '@/lib/reports'
@@ -39,6 +40,7 @@ import BarangayManagement from '@/components/admin/BarangayManagement'
 import PendingRegistrations from '@/components/admin/PendingRegistrations'
 import AnalyticsDashboard from '@/components/admin/AnalyticsDashboard'
 import BackupManagement from '@/components/admin/BackupManagement'
+import SMSSettings from '@/components/admin/SMSSettings'
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
@@ -243,7 +245,7 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 h-auto">
             <TabsTrigger value="overview" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Home className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Overview</span>
@@ -271,6 +273,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="backup" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Database className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Backup</span>
+            </TabsTrigger>
+            <TabsTrigger value="sms" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
+              <Smartphone className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">SMS</span>
             </TabsTrigger>
           </TabsList>
 
@@ -499,6 +505,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="backup" className="space-y-6">
             <BackupManagement />
+          </TabsContent>
+
+          <TabsContent value="sms" className="space-y-6">
+            <SMSSettings />
           </TabsContent>
         </Tabs>
       </div>
