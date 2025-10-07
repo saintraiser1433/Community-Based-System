@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const { firstName, lastName, email, phone, password, address, barangayId, role = 'RESIDENT' } = await request.json()
+    const { firstName, lastName, email, phone, password, address, barangayId, idFilePath, role = 'RESIDENT' } = await request.json()
 
     // Only allow resident registration through this endpoint
     if (role !== 'RESIDENT') {
@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         role: 'RESIDENT',
         isActive: false, // Inactive until approved by admin
-        barangayId
+        barangayId,
+        idFilePath // Store the uploaded ID file path
       }
     })
 

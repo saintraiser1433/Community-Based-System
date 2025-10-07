@@ -46,6 +46,7 @@ model User {
   // Resident specific fields
   barangayId String?
   barangay   Barangay? @relation(fields: [barangayId], references: [id])
+  idFilePath String?   // Path to uploaded ID file
   families   Family[]
   claims     Claim[] @relation("ClaimedByUser")
 

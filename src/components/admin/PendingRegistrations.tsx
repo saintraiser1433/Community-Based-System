@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { CheckCircle, XCircle, User, MapPin, Calendar, Mail, Phone } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { CheckCircle, XCircle, User, MapPin, Calendar, Mail, Phone, Eye, FileText } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import toast from 'react-hot-toast'
 
@@ -15,6 +16,8 @@ interface PendingRegistration {
   lastName: string
   email: string
   phone: string
+  address?: string
+  idFilePath?: string
   createdAt: string
   barangay?: {
     name: string
@@ -27,6 +30,7 @@ export default function PendingRegistrations() {
   const [isLoading, setIsLoading] = useState(true)
   const [showApproveConfirm, setShowApproveConfirm] = useState(false)
   const [showRejectConfirm, setShowRejectConfirm] = useState(false)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedRegistration, setSelectedRegistration] = useState<PendingRegistration | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -57,6 +61,11 @@ export default function PendingRegistrations() {
   const openRejectConfirm = (registration: PendingRegistration) => {
     setSelectedRegistration(registration)
     setShowRejectConfirm(true)
+  }
+
+  const openDetailsModal = (registration: PendingRegistration) => {
+    setSelectedRegistration(registration)
+    setShowDetailsModal(true)
   }
 
   const confirmApprove = async () => {
@@ -199,6 +208,15 @@ export default function PendingRegistrations() {
                       <div className="flex space-x-2">
                         <Button 
                           size="sm" 
+                          variant="outline"
+                          onClick={() => openDetailsModal(registration)}
+                          className="text-blue-600 hover:text-blue-700 border-blue-600 hover:border-blue-700"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Details
+                        </Button>
+                        <Button 
+                          size="sm" 
                           onClick={() => openApproveConfirm(registration)}
                           className="bg-green-600 hover:bg-green-700"
                         >
@@ -245,6 +263,161 @@ export default function PendingRegistrations() {
         action="delete"
         loading={loading}
       />
+
+      {/* Registration Details Modal */}
+      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <User className="h-5 w-5" />
+              <span>Registration Details</span>
+            </DialogTitle>
+            <DialogDescription>
+              Review the registration details and uploaded ID for {selectedRegistration?.firstName} {selectedRegistration?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedRegistration && (
+            <div className="space-y-6">
+              {/* Personal Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Personal Information</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Full Name</label>
+                      <p className="text-sm">{selectedRegistration.firstName} {selectedRegistration.lastName}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Email</label>
+                      <p className="text-sm">{selectedRegistration.email}</p>
+                    </div>
+                    {selectedRegistration.phone && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Phone</label>
+                        <p className="text-sm">{selectedRegistration.phone}</p>
+                      </div>
+                    )}
+                    {selectedRegistration.address && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Address</label>
+                        <p className="text-sm">{selectedRegistration.address}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Barangay Information</h3>
+                  <div className="space-y-3">
+                    {selectedRegistration.barangay ? (
+                      <>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Barangay</label>
+                          <p className="text-sm">{selectedRegistration.barangay.name}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Barangay Code</label>
+                          <p className="text-sm">{selectedRegistration.barangay.code}</p>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm text-gray-500">No barangay information</p>
+                    )}
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Registration Date</label>
+                      <p className="text-sm">{new Date(selectedRegistration.createdAt).toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ID Document */}
+              {selectedRegistration.idFilePath && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center space-x-2">
+                    <FileText className="h-5 w-5" />
+                    <span>Uploaded ID Document</span>
+                  </h3>
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-center">
+                      {selectedRegistration.idFilePath.toLowerCase().includes('.pdf') ? (
+                        <div className="text-center">
+                          <FileText className="h-16 w-16 text-red-500 mx-auto mb-2" />
+                          <p className="text-sm text-gray-600">PDF Document</p>
+                          <a 
+                            href={selectedRegistration.idFilePath} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 text-sm underline"
+                          >
+                            View PDF Document
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <img 
+                            src={selectedRegistration.idFilePath} 
+                            alt="Uploaded ID" 
+                            className="max-w-full max-h-96 object-contain rounded-lg border"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                              e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                            }}
+                          />
+                          <div className="hidden">
+                            <FileText className="h-16 w-16 text-gray-400 mx-auto mb-2" />
+                            <p className="text-sm text-gray-600">Image not available</p>
+                            <a 
+                              href={selectedRegistration.idFilePath} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 text-sm underline"
+                            >
+                              View Image
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowDetailsModal(false)}
+                >
+                  Close
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setShowDetailsModal(false)
+                    openRejectConfirm(selectedRegistration)
+                  }}
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700 border-red-600 hover:border-red-700"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Reject
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setShowDetailsModal(false)
+                    openApproveConfirm(selectedRegistration)
+                  }}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Approve
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

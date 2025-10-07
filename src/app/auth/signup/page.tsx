@@ -30,6 +30,9 @@ export default function SignUpPage() {
   const [isLoadingBarangays, setIsLoadingBarangays] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadedFilePath, setUploadedFilePath] = useState('')
   const router = useRouter()
 
   useEffect(() => {
@@ -64,6 +67,41 @@ export default function SignUpPage() {
     })
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+      setError('')
+    }
+  }
+
+  const uploadFile = async (file: File) => {
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setUploadedFilePath(data.filePath)
+        return data.filePath
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Upload failed')
+      }
+    } catch (error) {
+      console.error('File upload error:', error)
+      throw error
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -90,7 +128,16 @@ export default function SignUpPage() {
       return
     }
 
+    if (!selectedFile) {
+      setError('Please upload a valid ID as proof of barangay residence')
+      setIsLoading(false)
+      return
+    }
+
     try {
+      console.log('Uploading ID file...')
+      const filePath = await uploadFile(selectedFile)
+      
       console.log('Submitting registration...')
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -99,6 +146,7 @@ export default function SignUpPage() {
         },
         body: JSON.stringify({
           ...formData,
+          idFilePath: filePath,
           role: 'RESIDENT'
         }),
       })
@@ -267,6 +315,28 @@ export default function SignUpPage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="idFile">Valid ID (Required)</Label>
+                <div className="space-y-2">
+                  <Input
+                    id="idFile"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={handleFileChange}
+                    required
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Upload a valid ID (JPEG, PNG, or PDF) as proof of barangay residence. Maximum file size: 5MB.
+                  </p>
+                  {selectedFile && (
+                    <div className="text-xs text-green-600">
+                      Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Input
@@ -322,8 +392,8 @@ export default function SignUpPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 text-sm sm:text-base" disabled={isLoading}>
-                {isLoading ? 'Creating Account...' : 'Register as Resident'}
+              <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 text-sm sm:text-base" disabled={isLoading || isUploading}>
+                {isLoading ? 'Creating Account...' : isUploading ? 'Uploading ID...' : 'Register as Resident'}
               </Button>
             </form>
 

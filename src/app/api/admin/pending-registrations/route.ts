@@ -22,14 +22,32 @@ export async function GET(request: NextRequest) {
         role: 'RESIDENT'
       },
       include: {
-        barangay: true
+        barangay: true,
+        families: {
+          select: {
+            address: true
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc'
       }
     })
 
-    return NextResponse.json(pendingRegistrations)
+    // Transform the data to include address and ID file path
+    const transformedRegistrations = pendingRegistrations.map(registration => ({
+      id: registration.id,
+      firstName: registration.firstName,
+      lastName: registration.lastName,
+      email: registration.email,
+      phone: registration.phone,
+      address: registration.families[0]?.address || null,
+      idFilePath: registration.idFilePath,
+      createdAt: registration.createdAt,
+      barangay: registration.barangay
+    }))
+
+    return NextResponse.json(transformedRegistrations)
   } catch (error) {
     console.error('Error fetching pending registrations:', error)
     return NextResponse.json(
