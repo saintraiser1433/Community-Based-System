@@ -4,8 +4,9 @@
 
 ### **Required Format:**
 - **Philippine Mobile Numbers Only**
-- **Format:** `09XXXXXXXXX` (11 digits)
-- **Example:** `09123456789`
+- **Local Format:** `09XXXXXXXXX` (11 digits) - for user input
+- **SMS Gateway Format:** `+63XXXXXXXXX` (13 characters) - for sending SMS
+- **Example:** `09123456789` → `+639123456789`
 
 ### **Input Format in Frontend:**
 - **Display Format:** `09XX XXX XXXX` (with spaces for readability)
@@ -62,25 +63,32 @@ const cleanPhone = phone.replace(/\D/g, '') // Remove all non-numeric characters
 const formattedPhone = cleanPhone.startsWith('09') ? cleanPhone : `09${cleanPhone}`
 ```
 
-### **SMS Gateway Formatting:**
+### **SMS Gateway Formatting (International Format):**
 ```typescript
-// Format phone numbers for Android SMS Gateway
+// Format phone numbers for Android SMS Gateway (international format)
 const phoneNumbers = residents
   .filter(resident => resident.phone)
   .map(resident => {
     let phone = resident.phone!
     // Remove all non-numeric characters
     phone = phone.replace(/\D/g, '')
-    // Ensure it starts with 09 for Philippine numbers
+    
+    // Convert to international format (+63)
     if (phone.startsWith('09')) {
-      return phone
+      // Remove the 0 and add +63
+      return '+63' + phone.substring(1)
     } else if (phone.startsWith('9')) {
-      return '0' + phone
+      // Add +63 prefix
+      return '+63' + phone
+    } else if (phone.startsWith('63')) {
+      // Already has country code, add +
+      return '+' + phone
     } else {
-      return '09' + phone
+      // Assume it's a 10-digit number, add +63
+      return '+63' + phone
     }
   })
-  .filter(phone => phone.length === 11) // Only include valid 11-digit numbers
+  .filter(phone => phone.startsWith('+63') && phone.length === 13) // Only include valid international format
 ```
 
 ## 📋 **User Instructions:**
@@ -107,13 +115,49 @@ const phoneNumbers = residents
 
 ### **Message Examples:**
 ```
-🎉 NEW DONATION SCHEDULE!
+NEW DONATION SCHEDULE!
 
 Rice and Canned Goods Distribution
 
 Free distribution of rice and canned goods for all residents
 
+📅 Date: Monday, December 16, 2024
+🕐 Time: 8:00 AM - 12:00 PM
+📍 Location: Barangay Hall
+
 Please check your resident dashboard for more details.
+
+- MSWDO-GLAN CBDS
+```
+
+### **Reminder Message Example:**
+```
+⏰ REMINDER: Donation Schedule Tomorrow!
+
+Rice and Canned Goods Distribution
+
+📅 Date: Monday, December 16, 2024
+🕐 Time: 8:00 AM - 12:00 PM
+📍 Location: Barangay Hall
+
+Don't miss out on this opportunity!
+
+- MSWDO-GLAN CBDS
+```
+
+### **Cancellation Message Example:**
+```
+❌ SCHEDULE CANCELLED!
+
+Rice and Canned Goods Distribution
+
+📅 Date: Monday, December 16, 2024
+🕐 Time: 8:00 AM - 12:00 PM
+📍 Location: Barangay Hall
+
+Reason: Due to weather conditions
+
+We apologize for any inconvenience. Please check your resident dashboard for updates.
 
 - MSWDO-GLAN CBDS
 ```

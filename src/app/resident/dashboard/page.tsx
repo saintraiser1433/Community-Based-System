@@ -32,6 +32,15 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 
+// Helper function to convert 24-hour time to 12-hour format
+const formatTime12Hour = (time24: string): string => {
+  const [hours, minutes] = time24.split(':')
+  const hour24 = parseInt(hours)
+  const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24
+  const ampm = hour24 >= 12 ? 'PM' : 'AM'
+  return `${hour12}:${minutes} ${ampm}`
+}
+
 export default function ResidentDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -403,7 +412,7 @@ export default function ResidentDashboard() {
                           <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
                             <div className="flex items-center space-x-1">
                               <Clock className="h-4 w-4" />
-                              <span>{schedule.startTime} - {schedule.endTime}</span>
+                              <span>{formatTime12Hour(schedule.startTime)} - {formatTime12Hour(schedule.endTime)}</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <MapPin className="h-4 w-4" />
@@ -479,7 +488,7 @@ export default function ResidentDashboard() {
                             </div>
                             <div className="flex items-center space-x-1">
                               <Clock className="h-4 w-4" />
-                              <span>{schedule.startTime} - {schedule.endTime}</span>
+                              <span>{formatTime12Hour(schedule.startTime)} - {formatTime12Hour(schedule.endTime)}</span>
                             </div>
                             <div className="flex items-center space-x-1">
                               <MapPin className="h-4 w-4" />
@@ -769,7 +778,7 @@ export default function ResidentDashboard() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Time</Label>
-                  <p className="text-sm">{selectedSchedule.startTime} - {selectedSchedule.endTime}</p>
+                  <p className="text-sm">{formatTime12Hour(selectedSchedule.startTime)} - {formatTime12Hour(selectedSchedule.endTime)}</p>
                 </div>
               </div>
 

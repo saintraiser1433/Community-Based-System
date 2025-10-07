@@ -33,6 +33,15 @@ import BarangayAnalytics from '@/components/barangay/BarangayAnalytics'
 import Pagination from '@/components/ui/pagination'
 import toast from 'react-hot-toast'
 
+// Helper function to convert 24-hour time to 12-hour format
+const formatTime12Hour = (time24: string): string => {
+  const [hours, minutes] = time24.split(':')
+  const hour24 = parseInt(hours)
+  const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24
+  const ampm = hour24 >= 12 ? 'PM' : 'AM'
+  return `${hour12}:${minutes} ${ampm}`
+}
+
 export default function BarangayDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -585,7 +594,7 @@ export default function BarangayDashboard() {
                           </div>
                           <div className="flex items-center space-x-1">
                             <Clock className="h-4 w-4" />
-                            <span>{schedule.startTime} - {schedule.endTime}</span>
+                            <span>{formatTime12Hour(schedule.startTime)} - {formatTime12Hour(schedule.endTime)}</span>
                           </div>
                         </div>
                       </div>
@@ -619,8 +628,8 @@ export default function BarangayDashboard() {
                       <CardTitle>Create New Schedule</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <form onSubmit={handleCreateSchedule} className="space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
+                      <form onSubmit={handleCreateSchedule} className="space-y-4 sm:space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="title">Title</Label>
                             <Input
@@ -651,10 +660,11 @@ export default function BarangayDashboard() {
                             value={newSchedule.description}
                             onChange={(e) => setNewSchedule({...newSchedule, description: e.target.value})}
                             placeholder="Schedule description"
+                            className="min-h-[80px] sm:min-h-[100px]"
                           />
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="startTime">Start Time</Label>
                             <Input
@@ -675,7 +685,7 @@ export default function BarangayDashboard() {
                               required
                             />
                           </div>
-                          <div className="space-y-2">
+                          <div className="space-y-2 sm:col-span-2 lg:col-span-1">
                             <Label htmlFor="maxRecipients">Max Recipients</Label>
                             <Input
                               id="maxRecipients"
@@ -698,11 +708,11 @@ export default function BarangayDashboard() {
                           />
                         </div>
 
-                        <div className="flex space-x-2">
-                          <Button type="submit" disabled={loading}>
+                        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                          <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                             {loading ? 'Creating...' : 'Create Schedule'}
                           </Button>
-                          <Button type="button" variant="outline" onClick={() => setShowCreateSchedule(false)} disabled={loading}>
+                          <Button type="button" variant="outline" onClick={() => setShowCreateSchedule(false)} disabled={loading} className="w-full sm:w-auto">
                             Cancel
                           </Button>
                         </div>
@@ -728,7 +738,7 @@ export default function BarangayDashboard() {
                             placeholder="Enter schedule title"
                             required
                           />
-                        </div>
+                            </div>
 
                         <div>
                           <Label htmlFor="edit-description">Description</Label>
@@ -739,7 +749,7 @@ export default function BarangayDashboard() {
                             placeholder="Enter description"
                             rows={3}
                           />
-                        </div>
+                            </div>
 
                         <div className="grid grid-cols-3 gap-4">
                           <div>
@@ -752,7 +762,7 @@ export default function BarangayDashboard() {
                               min={new Date().toISOString().split('T')[0]}
                               required
                             />
-                          </div>
+                            </div>
 
                           <div>
                             <Label htmlFor="edit-startTime">Start Time</Label>
@@ -774,7 +784,7 @@ export default function BarangayDashboard() {
                               onChange={(e) => setNewSchedule({ ...newSchedule, endTime: e.target.value })}
                               required
                             />
-                          </div>
+                        </div>
                         </div>
 
                         <div>
@@ -829,75 +839,89 @@ export default function BarangayDashboard() {
                   ) : (
                     <>
                       {getPaginatedData(schedules, schedulesPage, itemsPerPage).map((schedule: any) => (
-                    <div key={schedule.id} className="border rounded-lg p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-2">
-                          <h3 className="text-lg font-semibold">{schedule.title}</h3>
-                          <p className="text-gray-600">{schedule.description}</p>
-                          <div className="flex items-center space-x-6 text-sm text-gray-500">
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="h-4 w-4" />
-                              <span>{new Date(schedule.date).toLocaleDateString()}</span>
+                    <div key={schedule.id} className="border rounded-lg p-4 sm:p-6">
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-4 lg:space-y-0">
+                        <div className="space-y-3 flex-1">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-2 sm:space-y-0">
+                            <h3 className="text-lg font-semibold">{schedule.title}</h3>
+                            <Badge variant={schedule.status === 'SCHEDULED' ? 'default' : 'secondary'} className="w-fit">
+                            {schedule.status}
+                          </Badge>
+                          </div>
+                          <p className="text-gray-600 text-sm sm:text-base">{schedule.description}</p>
+                          
+                          {/* Mobile-first info grid */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-gray-500">
+                            <div className="flex items-center space-x-2">
+                              <Calendar className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{new Date(schedule.date).toLocaleDateString()}</span>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <Clock className="h-4 w-4" />
-                              <span>{schedule.startTime} - {schedule.endTime}</span>
+                            <div className="flex items-center space-x-2">
+                              <Clock className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{formatTime12Hour(schedule.startTime)} - {formatTime12Hour(schedule.endTime)}</span>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <MapPin className="h-4 w-4" />
-                              <span>{schedule.location}</span>
+                            <div className="flex items-center space-x-2 sm:col-span-2 lg:col-span-1">
+                              <MapPin className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{schedule.location}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant={schedule.status === 'SCHEDULED' ? 'default' : 'secondary'}>
-                            {schedule.status}
-                          </Badge>
-                          {schedule.status === 'SCHEDULED' && (
-                            <>
-                              <Button variant="outline" size="sm" onClick={() => openEditSchedule(schedule)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit
-                          </Button>
+                        
+                        {/* Action buttons - responsive layout */}
+                        {schedule.status === 'SCHEDULED' && (
+                          <div className="flex flex-col sm:flex-row gap-2 lg:ml-4">
+                            {/* Mobile: Stack buttons vertically */}
+                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => openEditSchedule(schedule)}
+                                className="text-xs sm:text-sm"
+                              >
+                                <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                <span className="hidden sm:inline">Edit</span>
+                              </Button>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
                                 onClick={() => openDeleteConfirm(schedule)}
-                                className="text-red-600 hover:text-red-700"
+                                className="text-red-600 hover:text-red-700 text-xs sm:text-sm"
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                <span className="hidden sm:inline">Delete</span>
                               </Button>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
                                 onClick={() => openDistributedConfirm(schedule)}
-                                className="text-green-600 hover:text-green-700"
+                                className="text-green-600 hover:text-green-700 text-xs sm:text-sm"
                               >
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Mark as Distributed
+                                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                <span className="hidden sm:inline">Distributed</span>
                               </Button>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
                                 onClick={() => openCancelConfirm(schedule)}
-                                className="text-orange-600 hover:text-orange-700"
+                                className="text-orange-600 hover:text-orange-700 text-xs sm:text-sm"
                               >
-                                <AlertCircle className="h-4 w-4 mr-2" />
-                                Cancel
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => sendReminder(schedule.id)}
-                                className="text-blue-600 hover:text-blue-700"
-                              >
-                                <Bell className="h-4 w-4 mr-2" />
-                                Send Reminder
-                              </Button>
-                            </>
-                          )}
+                                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                <span className="hidden sm:inline">Cancel</span>
+                          </Button>
                         </div>
+                            
+                            {/* Reminder button - full width on mobile */}
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => sendReminder(schedule.id)}
+                              className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm w-full sm:w-auto"
+                            >
+                              <Bell className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                              Send Reminder
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

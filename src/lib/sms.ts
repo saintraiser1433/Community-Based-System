@@ -1,26 +1,67 @@
-import AndroidSMSGateway from 'android-sms-gateway'
+// Dynamic import to avoid module resolution issues
+let Client: any
 
 const httpFetchClient = {
-  get: async (url: string, headers: any) => {
+  get: async <T>(url: string, headers?: Record<string, string>): Promise<T> => {
     const response = await fetch(url, {
       method: "GET",
       headers
     });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     return response.json();
   },
-  post: async (url: string, body: any, headers: any) => {
+  post: async <T>(url: string, body: any, headers?: Record<string, string>): Promise<T> => {
     const response = await fetch(url, {
       method: "POST",
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
       body: JSON.stringify(body)
     });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     return response.json();
   },
-  delete: async (url: string, headers: any) => {
+  put: async <T>(url: string, body: any, headers?: Record<string, string>): Promise<T> => {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+  patch: async <T>(url: string, body: any, headers?: Record<string, string>): Promise<T> => {
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+  delete: async <T>(url: string, headers?: Record<string, string>): Promise<T> => {
     const response = await fetch(url, {
       method: "DELETE",
       headers
     });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     return response.json();
   }
 };
@@ -38,14 +79,33 @@ export interface SMSResult {
 
 export const sendSMS = async (username: string, password: string, body: SMSMessage): Promise<SMSResult> => {
   try {
-    const messages = {
+    console.log('SMS Service - Starting SMS send process')
+    console.log('SMS Service - Username:', username)
+    console.log('SMS Service - Has Password:', !!password)
+    console.log('SMS Service - Phone Numbers:', body.phoneNumbers)
+    console.log('SMS Service - Message Length:', body.message.length)
+    
+    // Dynamic import to avoid module resolution issues
+    if (!Client) {
+      const AndroidSMSGateway = await import('android-sms-gateway')
+      Client = AndroidSMSGateway.default
+    }
+    
+    // Create the message object according to the API documentation
+    const message = {
+      message: body.message,
       phoneNumbers: body.phoneNumbers,
-      message: body.message
+      withDeliveryReport: true,
+      ttl: 3600 // 1 hour TTL
     };
     
-    const api = new AndroidSMSGateway(username, password, httpFetchClient);
-    const state = await api.send(messages);
+    console.log('SMS Service - Creating Client instance')
+    const api = new Client(username, password, httpFetchClient);
     
+    console.log('SMS Service - Sending SMS via gateway')
+    const state = await api.send(message);
+    
+    console.log('SMS Service - SMS Result:', state);
     console.log('SMS Message ID:', state.id);
 
     // Check status after 5 seconds
@@ -65,6 +125,11 @@ export const sendSMS = async (username: string, password: string, body: SMSMessa
 
   } catch (err: any) {
     console.error('SMS sending error:', err);
+    console.error('SMS Error Details:', {
+      message: err.message,
+      stack: err.stack,
+      name: err.name
+    });
     return {
       success: false,
       error: err.message || 'Failed to send SMS'
@@ -74,18 +139,21 @@ export const sendSMS = async (username: string, password: string, body: SMSMessa
 
 export const testSMSConnection = async (username: string, password: string): Promise<SMSResult> => {
   try {
-    const api = new AndroidSMSGateway(username, password, httpFetchClient);
+    console.log('Testing SMS connection with username:', username)
     
-    // Try to get account info or make a simple API call to test connection
-    // This is a basic test - you might need to adjust based on the actual API
-    const testMessage: SMSMessage = {
-      message: 'Test SMS from MSWDO-GLAN CBDS',
-      phoneNumbers: [] // Empty array for test
-    };
+    // Dynamic import to avoid module resolution issues
+    if (!Client) {
+      const AndroidSMSGateway = await import('android-sms-gateway')
+      Client = AndroidSMSGateway.default
+    }
     
-    // For testing, we'll just try to initialize the client
-    // The actual send will fail with empty phone numbers, but we can catch the auth error
-    await api.send(testMessage);
+    const api = new Client(username, password, httpFetchClient);
+    
+    // Try to get health status to test connection
+    console.log('Testing connection by checking health status...')
+    const health = await api.getHealth();
+    
+    console.log('Health check result:', health)
     
     return {
       success: true,
@@ -93,6 +161,8 @@ export const testSMSConnection = async (username: string, password: string): Pro
     };
 
   } catch (err: any) {
+    console.error('SMS connection test error:', err)
+    
     // If it's an authentication error, that's what we want to test
     if (err.message?.includes('auth') || err.message?.includes('credential') || err.message?.includes('401')) {
       return {
@@ -101,11 +171,11 @@ export const testSMSConnection = async (username: string, password: string): Pro
       };
     }
     
-    // If it's a different error (like empty phone numbers), that means auth worked
-    if (err.message?.includes('phone') || err.message?.includes('number')) {
+    // If it's a network error, that means credentials might be correct but network issue
+    if (err.message?.includes('network') || err.message?.includes('fetch')) {
       return {
-        success: true,
-        messageId: 'test-connection'
+        success: false,
+        error: 'Network error. Please check your internet connection and SMS gateway URL.'
       };
     }
     

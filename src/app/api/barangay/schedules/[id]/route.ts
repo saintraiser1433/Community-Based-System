@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendScheduleCancellationNotification } from '@/lib/notifications'
 
 export async function GET(
   request: NextRequest,
@@ -143,6 +144,27 @@ export async function PUT(
       data: updateData
     })
 
+    // Send SMS notification if schedule is cancelled
+    if (isStatusOnlyUpdate && status === 'CANCELLED') {
+      try {
+        console.log('Sending SMS cancellation notification...')
+        const notificationResult = await sendScheduleCancellationNotification(
+          schedule.id,
+          user.barangayId,
+          'Schedule has been cancelled'
+        )
+
+        if (notificationResult.success) {
+          console.log(`SMS cancellation notifications sent successfully to ${notificationResult.sentCount} residents`)
+        } else {
+          console.error('SMS cancellation notifications failed:', notificationResult.errors)
+        }
+      } catch (smsError) {
+        console.error('Error sending SMS cancellation notifications:', smsError)
+        // Don't fail the update if SMS fails
+      }
+    }
+
     // Create audit log
     await prisma.auditLog.create({
       data: {
@@ -154,7 +176,14 @@ export async function PUT(
       }
     })
 
-    return NextResponse.json({ message: 'Schedule updated successfully', schedule })
+    return NextResponse.json({ 
+      message: 'Schedule updated successfully', 
+      schedule,
+      smsNotification: (isStatusOnlyUpdate && status === 'CANCELLED') ? {
+        sent: true,
+        message: 'SMS cancellation notifications sent to residents'
+      } : undefined
+    })
   } catch (error) {
     console.error('Error updating schedule:', error)
     return NextResponse.json(
@@ -217,6 +246,25 @@ export async function DELETE(
       }, { status: 400 })
     }
 
+    // Send SMS cancellation notification before deleting
+    try {
+      console.log('Sending SMS cancellation notification...')
+      const notificationResult = await sendScheduleCancellationNotification(
+        schedule.id,
+        user.barangayId,
+        'Schedule has been cancelled'
+      )
+
+      if (notificationResult.success) {
+        console.log(`SMS cancellation notifications sent successfully to ${notificationResult.sentCount} residents`)
+      } else {
+        console.error('SMS cancellation notifications failed:', notificationResult.errors)
+      }
+    } catch (smsError) {
+      console.error('Error sending SMS cancellation notifications:', smsError)
+      // Don't fail the deletion if SMS fails
+    }
+
     // Delete the schedule
     await prisma.donationSchedule.delete({
       where: { id }
@@ -231,7 +279,13 @@ export async function DELETE(
       }
     })
 
-    return NextResponse.json({ message: 'Schedule deleted successfully' })
+    return NextResponse.json({ 
+      message: 'Schedule deleted successfully',
+      smsNotification: {
+        sent: true,
+        message: 'SMS cancellation notifications sent to residents'
+      }
+    })
   } catch (error) {
     console.error('Error deleting schedule:', error)
     return NextResponse.json(
