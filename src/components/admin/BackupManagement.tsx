@@ -174,46 +174,57 @@ export default function BackupManagement() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+      <div className="flex flex-col space-y-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold">Database Backup & Restore</h2>
-          <p className="text-sm sm:text-base text-gray-600">Manage database backups and restore from previous states</p>
+          <h2 className="text-lg sm:text-xl font-bold">Database Backup & Restore</h2>
+          <p className="text-sm text-gray-600">Manage database backups and restore from previous states</p>
         </div>
-        <Dialog open={showCreateBackup} onOpenChange={setShowCreateBackup}>
-          <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">
-              <Database className="h-4 w-4 mr-2" />
-              Create Backup
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
+        <div className="flex justify-end">
+          <Dialog open={showCreateBackup} onOpenChange={setShowCreateBackup}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="w-full sm:w-auto">
+                <Database className="h-4 w-4 mr-2" />
+                Create Backup
+              </Button>
+            </DialogTrigger>
+          <DialogContent className="max-w-md mx-auto">
             <DialogHeader>
-              <DialogTitle>Create Database Backup</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-lg">Create Database Backup</DialogTitle>
+              <DialogDescription className="text-sm">
                 Create a backup of the current database state
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="backupName">Backup Name</Label>
+                <Label htmlFor="backupName" className="text-sm">Backup Name</Label>
                 <Input
                   id="backupName"
                   value={backupName}
                   onChange={(e) => setBackupName(e.target.value)}
                   placeholder="Enter backup name"
+                  className="text-sm"
                 />
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowCreateBackup(false)}>
+              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowCreateBackup(false)}
+                  className="w-full sm:w-auto text-sm"
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleCreateBackup} disabled={isLoading}>
+                <Button 
+                  onClick={handleCreateBackup} 
+                  disabled={isLoading}
+                  className="w-full sm:w-auto text-sm"
+                >
                   {isLoading ? 'Creating...' : 'Create Backup'}
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>
@@ -231,54 +242,61 @@ export default function BackupManagement() {
               <p className="text-sm text-gray-400">Create your first backup to get started</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {backups.map((backup) => (
-                <div key={backup.name} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg space-y-4 sm:space-y-0">
-                  <div className="flex items-center space-x-4 w-full sm:w-auto">
-                    <Database className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-medium text-sm sm:text-base truncate">{backup.name}</h3>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 text-xs sm:text-sm text-gray-500">
-                        <span>{formatFileSize(backup.size)}</span>
-                        <span className="hidden sm:inline">•</span>
-                        <span className="break-all sm:break-normal">{formatDate(backup.createdAt)}</span>
+                <div key={backup.name} className="border rounded-lg overflow-hidden">
+                  <div className="p-4">
+                    <div className="flex flex-col space-y-3">
+                      {/* Backup Info */}
+                      <div className="flex items-start space-x-3">
+                        <Database className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-medium text-sm truncate">{backup.name}</h3>
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs text-gray-500 mt-1">
+                            <span>{formatFileSize(backup.size)}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span className="break-all sm:break-normal">{formatDate(backup.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadBackup(backup)}
+                          className="flex-1 sm:flex-none text-xs h-8"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          Download
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBackup(backup)
+                            setShowRestoreConfirm(true)
+                          }}
+                          className="flex-1 sm:flex-none text-orange-600 hover:text-orange-700 text-xs h-8"
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          Restore
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedBackup(backup)
+                            setShowDeleteConfirm(true)
+                          }}
+                          className="flex-1 sm:flex-none text-red-600 hover:text-red-700 text-xs h-8"
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Delete
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownloadBackup(backup)}
-                      className="w-full sm:w-auto text-xs sm:text-sm"
-                    >
-                      <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      Download
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedBackup(backup)
-                        setShowRestoreConfirm(true)
-                      }}
-                      className="text-orange-600 hover:text-orange-700 w-full sm:w-auto text-xs sm:text-sm"
-                    >
-                      <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      Restore
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedBackup(backup)
-                        setShowDeleteConfirm(true)
-                      }}
-                      className="text-red-600 hover:text-red-700 w-full sm:w-auto text-xs sm:text-sm"
-                    >
-                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                      Delete
-                    </Button>
                   </div>
                 </div>
               ))}
