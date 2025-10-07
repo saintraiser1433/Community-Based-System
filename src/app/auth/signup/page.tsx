@@ -131,14 +131,14 @@ export default function SignUpPage() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <UserPlus className="h-8 w-8 text-green-500" />
+              <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <UserPlus className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
-              <p className="text-gray-600 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
+              <p className="text-sm sm:text-base text-gray-600 mb-4">
                 Your account has been created. You can now sign in with your credentials.
               </p>
-              <Button onClick={() => router.push('/auth/signin')} className="bg-pink-500 hover:bg-pink-600">
+              <Button onClick={() => router.push('/auth/signin')} className="bg-pink-500 hover:bg-pink-600 text-sm sm:text-base">
                 Go to Sign In
               </Button>
             </div>
@@ -151,23 +151,23 @@ export default function SignUpPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center text-pink-500 hover:text-pink-600 mb-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <Link href="/" className="inline-flex items-center text-pink-500 hover:text-pink-600 mb-4 text-sm sm:text-base">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home
           </Link>
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <Image src="/glanlogos.png" alt="Glan Logo" width={32} height={32} className="h-8 w-8" />
-            <span className="text-2xl font-bold text-gray-900">MSWDO-GLAN CBDS</span>
+            <Image src="/glanlogos.png" alt="Glan Logo" width={32} height={32} className="h-6 w-6 sm:h-8 sm:w-8" />
+            <span className="text-lg sm:text-2xl font-bold text-gray-900">MSWDO-GLAN CBDS</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Register as Resident</h1>
-          <p className="text-gray-600">Create your MSWDO-GLAN account to access donation schedules</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Register as Resident</h1>
+          <p className="text-sm sm:text-base text-gray-600">Create your MSWDO-GLAN account to access donation schedules</p>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Resident Registration</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg sm:text-xl">Resident Registration</CardTitle>
+            <CardDescription className="text-sm sm:text-base">
               Fill out the form below to register as a resident
             </CardDescription>
           </CardHeader>
@@ -179,9 +179,9 @@ export default function SignUpPage() {
                 </Alert>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName" className="text-sm">First Name</Label>
                   <Input
                     id="firstName"
                     name="firstName"
@@ -189,10 +189,11 @@ export default function SignUpPage() {
                     value={formData.firstName}
                     onChange={handleChange}
                     required
+                    className="text-sm"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName" className="text-sm">Last Name</Label>
                   <Input
                     id="lastName"
                     name="lastName"
@@ -200,6 +201,7 @@ export default function SignUpPage() {
                     value={formData.lastName}
                     onChange={handleChange}
                     required
+                    className="text-sm"
                   />
                 </div>
               </div>
@@ -320,13 +322,13 @@ export default function SignUpPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600" disabled={isLoading}>
+              <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 text-sm sm:text-base" disabled={isLoading}>
                 {isLoading ? 'Creating Account...' : 'Register as Resident'}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 sm:mt-6 text-center">
+              <p className="text-xs sm:text-sm text-gray-600">
                 Already have an account?{' '}
                 <Link href="/auth/signin" className="text-pink-500 hover:text-pink-600 font-medium">
                   Sign In

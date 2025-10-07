@@ -86,26 +86,27 @@ export default function LandingPage() {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 space-y-4 sm:space-y-0">
             <div className="flex items-center space-x-2">
-              <Image src="/glanlogos.png" alt="Glan Logo" width={32} height={32} className="h-8 w-8" />
-              <span className="text-2xl font-bold text-gray-900">MSWDO-GLAN CBDS</span>
+              <Image src="/glanlogos.png" alt="Glan Logo" width={32} height={32} className="h-6 w-6 sm:h-8 sm:w-8" />
+              <span className="text-lg sm:text-2xl font-bold text-gray-900">MSWDO-GLAN CBDS</span>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
               <Button 
                 variant="outline" 
                 onClick={() => router.push('/auth/signin')}
-                className="flex items-center space-x-2"
+                className="flex items-center justify-center space-x-2 w-full sm:w-auto"
               >
                 <LogIn className="h-4 w-4" />
                 <span>Sign In</span>
               </Button>
               <Button 
                 onClick={() => router.push('/auth/signup')}
-                className="bg-pink-500 hover:bg-pink-600 text-white flex items-center space-x-2"
+                className="bg-pink-500 hover:bg-pink-600 text-white flex items-center justify-center space-x-2 w-full sm:w-auto"
               >
                 <UserPlus className="h-4 w-4" />
-                <span>Register as Resident</span>
+                <span className="hidden sm:inline">Register as Resident</span>
+                <span className="sm:hidden">Register</span>
               </Button>
             </div>
           </div>
@@ -120,32 +121,33 @@ export default function LandingPage() {
               <Image src="/glanlogos.png" alt="Glan Logo" width={12} height={12} className="h-3 w-3 mr-1" />
               Municipality of Glan
             </Badge>
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-              MSWDO-GLAN Community Based
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+              <span className="block">MSWDO-GLAN Community Based</span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-blue-500">
-                {" "}Donation and Management System
+                Donation and Management System
               </span>
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto px-4">
               A transparent platform that connects donors with community members in need, 
               ensuring fair distribution through organized schedules and verified claims.
             </p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16 px-4">
             <Button 
               size="lg" 
               onClick={() => router.push('/auth/signup')}
-              className="bg-pink-500 hover:bg-pink-600 text-white px-8 py-4 text-lg"
+              className="bg-pink-500 hover:bg-pink-600 text-white px-6 sm:px-8 py-4 text-base sm:text-lg w-full sm:w-auto"
             >
               <UserPlus className="h-5 w-5 mr-2" />
-              Register as Resident
+              <span className="hidden sm:inline">Register as Resident</span>
+              <span className="sm:hidden">Register</span>
             </Button>
             <Button 
               size="lg" 
               variant="outline"
               onClick={() => router.push('/auth/signin')}
-              className="px-8 py-4 text-lg"
+              className="px-6 sm:px-8 py-4 text-base sm:text-lg w-full sm:w-auto"
             >
               <LogIn className="h-5 w-5 mr-2" />
               Sign In
@@ -153,11 +155,11 @@ export default function LandingPage() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 mb-16 px-4">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
-                <div className="text-3xl font-bold text-gray-900 mb-2">{stat.value}</div>
-                <div className="text-gray-600">{stat.label}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{stat.value}</div>
+                <div className="text-sm sm:text-base text-gray-600">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -167,14 +169,14 @@ export default function LandingPage() {
       {/* Features Section */}
       <section className="py-20 bg-white/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose Our System?</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <div className="text-center mb-16 px-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Why Choose Our System?</h2>
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
               Built with transparency, fairness, and community welfare in mind.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {features.map((feature, index) => (
               <Card key={index} className="text-center hover:shadow-lg transition-shadow">
                 <CardHeader>
@@ -195,14 +197,14 @@ export default function LandingPage() {
       {/* How It Works */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <div className="text-center mb-16 px-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
               Simple steps to ensure fair and transparent donation distribution.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             <div className="text-center">
               <div className="bg-pink-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                 <UserPlus className="h-8 w-8 text-pink-500" />
@@ -233,9 +235,9 @@ export default function LandingPage() {
       {/* FAQ Section */}
       <section className="py-20 bg-white/50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
-            <p className="text-xl text-gray-600">
+          <div className="text-center mb-16 px-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Frequently Asked Questions</h2>
+            <p className="text-base sm:text-lg md:text-xl text-gray-600">
               Get answers to common questions about our donation system.
             </p>
           </div>
@@ -247,12 +249,12 @@ export default function LandingPage() {
                   className="cursor-pointer"
                   onClick={() => setOpenFaq(openFaq === index ? null : index)}
                 >
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg">{faq.question}</CardTitle>
+                  <div className="flex justify-between items-start space-x-4">
+                    <CardTitle className="text-base sm:text-lg text-left">{faq.question}</CardTitle>
                     {openFaq === index ? (
-                      <ChevronUp className="h-5 w-5 text-gray-500" />
+                      <ChevronUp className="h-5 w-5 text-gray-500 flex-shrink-0 mt-1" />
                     ) : (
-                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                      <ChevronDown className="h-5 w-5 text-gray-500 flex-shrink-0 mt-1" />
                     )}
                   </div>
                 </CardHeader>
@@ -270,14 +272,14 @@ export default function LandingPage() {
       {/* Contact Section */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Contact Us</h2>
-            <p className="text-xl text-gray-600">
+          <div className="text-center mb-16 px-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Contact Us</h2>
+            <p className="text-base sm:text-lg md:text-xl text-gray-600">
               Get in touch with us for support or questions.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             <Card className="text-center">
               <CardHeader>
                 <Phone className="h-8 w-8 text-pink-500 mx-auto mb-4" />
@@ -317,12 +319,12 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Image src="/glanlogos.png" alt="Glan Logo" width={24} height={24} className="h-6 w-6" />
-              <span className="text-xl font-bold">MSWDO-GLAN Community Based Donation and Management System</span>
+          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+            <div className="flex items-center space-x-2 text-center md:text-left">
+              <Image src="/glanlogos.png" alt="Glan Logo" width={24} height={24} className="h-6 w-6 flex-shrink-0" />
+              <span className="text-base sm:text-lg md:text-xl font-bold">MSWDO-GLAN Community Based Donation and Management System</span>
             </div>
-            <div className="text-gray-400 text-sm">
+            <div className="text-gray-400 text-xs sm:text-sm text-center md:text-right">
               © 2024 MSWDO-GLAN CBDS. All rights reserved. Built for the Municipality of Glan, Sarangani Province.
             </div>
           </div>

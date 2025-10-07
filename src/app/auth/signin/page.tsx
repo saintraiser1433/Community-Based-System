@@ -63,23 +63,23 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center text-pink-500 hover:text-pink-600 mb-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <Link href="/" className="inline-flex items-center text-pink-500 hover:text-pink-600 mb-4 text-sm sm:text-base">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home
           </Link>
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <Image src="/glanlogos.png" alt="Glan Logo" width={32} height={32} className="h-8 w-8" />
-            <span className="text-2xl font-bold text-gray-900">MSWDO-GLAN CBDS</span>
+            <Image src="/glanlogos.png" alt="Glan Logo" width={32} height={32} className="h-6 w-6 sm:h-8 sm:w-8" />
+            <span className="text-lg sm:text-2xl font-bold text-gray-900">MSWDO-GLAN CBDS</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your MSWDO-GLAN account</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Welcome Back</h1>
+          <p className="text-sm sm:text-base text-gray-600">Sign in to your MSWDO-GLAN account</p>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg sm:text-xl">Sign In</CardTitle>
+            <CardDescription className="text-sm sm:text-base">
               Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
@@ -130,13 +130,13 @@ export default function SignInPage() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600" disabled={isLoading}>
+              <Button type="submit" className="w-full bg-pink-500 hover:bg-pink-600 text-sm sm:text-base" disabled={isLoading}>
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 sm:mt-6 text-center">
+              <p className="text-xs sm:text-sm text-gray-600">
                 Don't have an account?{' '}
                 <Link href="/auth/signup" className="text-pink-500 hover:text-pink-600 font-medium">
                   Register as Resident
