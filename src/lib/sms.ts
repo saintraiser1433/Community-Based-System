@@ -1,4 +1,4 @@
-import { Client } from 'android-sms-gateway'
+import AndroidSMSGateway from 'android-sms-gateway'
 
 const httpFetchClient = {
   get: async (url: string, headers: any) => {
@@ -43,7 +43,7 @@ export const sendSMS = async (username: string, password: string, body: SMSMessa
       message: body.message
     };
     
-    const api = new Client(username, password, httpFetchClient);
+    const api = new AndroidSMSGateway(username, password, httpFetchClient);
     const state = await api.send(messages);
     
     console.log('SMS Message ID:', state.id);
@@ -74,7 +74,7 @@ export const sendSMS = async (username: string, password: string, body: SMSMessa
 
 export const testSMSConnection = async (username: string, password: string): Promise<SMSResult> => {
   try {
-    const api = new Client(username, password, httpFetchClient);
+    const api = new AndroidSMSGateway(username, password, httpFetchClient);
     
     // Try to get account info or make a simple API call to test connection
     // This is a basic test - you might need to adjust based on the actual API
