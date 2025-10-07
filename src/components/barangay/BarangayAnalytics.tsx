@@ -73,6 +73,15 @@ interface BarangayAnalytics {
     residentEngagement: number
     claimEfficiency: number
   }
+  unclaimedResidents: Array<{
+    id: string
+    name: string
+    email: string
+    phone: string
+    lastClaim: string | null
+    totalClaims: number
+    registrationDate: string
+  }>
 }
 
 export default function BarangayAnalytics() {
@@ -438,6 +447,62 @@ export default function BarangayAnalytics() {
                 </div>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Unclaimed Residents */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <AlertCircle className="h-5 w-5 text-orange-500" />
+            <span>Unclaimed Residents</span>
+          </CardTitle>
+          <CardDescription>
+            Residents who haven't claimed any donations yet
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {analytics.unclaimedResidents.length > 0 ? (
+              analytics.unclaimedResidents.map((resident) => (
+                <div key={resident.id} className="flex items-center justify-between p-4 border rounded-lg bg-orange-50 border-orange-200">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                      <Users className="h-6 w-6 text-orange-500" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{resident.name}</div>
+                      <div className="text-sm text-gray-500">{resident.email}</div>
+                      <div className="text-xs text-gray-400">
+                        Registered: {new Date(resident.registrationDate).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-center">
+                      <div className="font-bold text-orange-600">{resident.totalClaims}</div>
+                      <div className="text-xs text-gray-500">total claims</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="font-bold text-orange-600">
+                        {resident.lastClaim ? new Date(resident.lastClaim).toLocaleDateString() : 'Never'}
+                      </div>
+                      <div className="text-xs text-gray-500">last claim</div>
+                    </div>
+                    <Badge variant="outline" className="text-orange-600 border-orange-600">
+                      Unclaimed
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">All Residents Active</h3>
+                <p className="text-gray-600">All residents in your barangay have claimed donations.</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

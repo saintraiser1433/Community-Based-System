@@ -209,6 +209,48 @@ export async function GET(request: NextRequest) {
       ? Math.round((totalClaims / (totalSchedules * 10)) * 100) // Assuming 10 is average expected claims per schedule
       : 0
 
+    // Get unclaimed residents (residents with no claims)
+    const unclaimedResidents = await prisma.user.findMany({
+      where: {
+        barangayId: user.barangayId,
+        role: 'RESIDENT',
+        isActive: true,
+        claims: {
+          none: {}
+        }
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        createdAt: true,
+        claims: {
+          select: {
+            createdAt: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 1
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+
+    const unclaimedResidentsData = unclaimedResidents.map(resident => ({
+      id: resident.id,
+      name: `${resident.firstName} ${resident.lastName}`,
+      email: resident.email,
+      phone: resident.phone || 'N/A',
+      lastClaim: resident.claims.length > 0 ? resident.claims[0].createdAt : null,
+      totalClaims: 0,
+      registrationDate: resident.createdAt
+    }))
+
     const analytics = {
       overview: {
         totalResidents,
@@ -233,7 +275,8 @@ export async function GET(request: NextRequest) {
         scheduleCompletion,
         residentEngagement,
         claimEfficiency
-      }
+      },
+      unclaimedResidents: unclaimedResidentsData
     }
 
     return NextResponse.json(analytics)

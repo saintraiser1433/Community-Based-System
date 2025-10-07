@@ -31,7 +31,6 @@ import {
   Trash2
 } from 'lucide-react'
 import Image from 'next/image'
-import ResidentAnalytics from '@/components/resident/ResidentAnalytics'
 
 export default function ResidentDashboard() {
   const { data: session, status } = useSession()
@@ -311,7 +310,7 @@ export default function ResidentDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 h-auto">
             <TabsTrigger value="overview" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Home className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Overview</span>
@@ -327,10 +326,6 @@ export default function ResidentDashboard() {
             <TabsTrigger value="claims" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Package className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Claims</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
-              <BarChart3 className="h-4 w-4" />
-              <span className="text-xs sm:text-sm">Analytics</span>
             </TabsTrigger>
           </TabsList>
 
@@ -677,9 +672,6 @@ export default function ResidentDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-6">
-            <ResidentAnalytics />
-          </TabsContent>
         </Tabs>
       </div>
 
