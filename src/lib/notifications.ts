@@ -66,10 +66,23 @@ export const sendScheduleNotificationToResidents = async (
     // Prepare SMS message
     const smsMessage = `🎉 NEW DONATION SCHEDULE!\n\n${notificationData.title}\n\n${notificationData.message}\n\nPlease check your resident dashboard for more details.\n\n- MSWDO-GLAN CBDS`
 
-    // Get phone numbers
+    // Get phone numbers and format them for SMS gateway
     const phoneNumbers = residents
       .filter(resident => resident.phone)
-      .map(resident => resident.phone!)
+      .map(resident => {
+        let phone = resident.phone!
+        // Remove all non-numeric characters
+        phone = phone.replace(/\D/g, '')
+        // Ensure it starts with 09 for Philippine numbers
+        if (phone.startsWith('09')) {
+          return phone
+        } else if (phone.startsWith('9')) {
+          return '0' + phone
+        } else {
+          return '09' + phone
+        }
+      })
+      .filter(phone => phone.length === 11) // Only include valid 11-digit numbers
 
     console.log(`Sending SMS to ${phoneNumbers.length} residents`)
 
@@ -186,7 +199,20 @@ export const sendClaimReminderNotification = async (
 
     const phoneNumbers = residents
       .filter(resident => resident.phone)
-      .map(resident => resident.phone!)
+      .map(resident => {
+        let phone = resident.phone!
+        // Remove all non-numeric characters
+        phone = phone.replace(/\D/g, '')
+        // Ensure it starts with 09 for Philippine numbers
+        if (phone.startsWith('09')) {
+          return phone
+        } else if (phone.startsWith('9')) {
+          return '0' + phone
+        } else {
+          return '09' + phone
+        }
+      })
+      .filter(phone => phone.length === 11) // Only include valid 11-digit numbers
 
     const smsResult = await sendSMS(
       smsSettings.username,

@@ -45,6 +45,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Format phone number for SMS compatibility
+    const cleanPhone = phone.replace(/\D/g, '') // Remove all non-numeric characters
+    const formattedPhone = cleanPhone.startsWith('09') ? cleanPhone : `09${cleanPhone}`
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
@@ -54,7 +58,7 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         email,
-        phone,
+        phone: formattedPhone, // Store formatted phone number
         password: hashedPassword,
         role: 'RESIDENT',
         isActive: false, // Inactive until approved by admin

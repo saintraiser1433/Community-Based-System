@@ -67,6 +67,31 @@ export default function SignUpPage() {
     })
   }
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value
+    
+    // Remove all non-numeric characters
+    value = value.replace(/\D/g, '')
+    
+    // Limit to 11 digits for Philippine mobile numbers
+    if (value.length > 11) {
+      value = value.substring(0, 11)
+    }
+    
+    // Format as 09XX XXX XXXX while typing
+    if (value.length > 4) {
+      value = value.substring(0, 4) + ' ' + value.substring(4)
+    }
+    if (value.length > 8) {
+      value = value.substring(0, 8) + ' ' + value.substring(8)
+    }
+    
+    setFormData(prev => ({
+      ...prev,
+      phone: value
+    }))
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -118,6 +143,14 @@ export default function SignUpPage() {
 
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters long')
+      setIsLoading(false)
+      return
+    }
+
+    // Validate phone number format
+    const cleanPhone = formData.phone.replace(/\D/g, '')
+    if (cleanPhone.length !== 11 || !cleanPhone.startsWith('09')) {
+      setError('Please enter a valid Philippine mobile number (09XXXXXXXXX)')
       setIsLoading(false)
       return
     }
@@ -273,11 +306,14 @@ export default function SignUpPage() {
                   id="phone"
                   name="phone"
                   type="tel"
-                  placeholder="Enter your phone number"
+                  placeholder="09XX XXX XXXX (e.g., 0912 345 6789)"
                   value={formData.phone}
-                  onChange={handleChange}
+                  onChange={handlePhoneChange}
                   required
                 />
+                <p className="text-xs text-gray-500">
+                  Enter your mobile number (e.g., 09123456789). This will be used for SMS notifications.
+                </p>
               </div>
 
               <div className="space-y-2">
