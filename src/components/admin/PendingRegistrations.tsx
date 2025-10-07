@@ -254,18 +254,18 @@ export default function PendingRegistrations() {
                 ))}
               </TableBody>
             </Table>
-            
-            {registrations.length > itemsPerPage && (
-              <div className="mt-6">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={getTotalPages(registrations, itemsPerPage)}
-                  onPageChange={setCurrentPage}
-                  totalItems={registrations.length}
-                  itemsPerPage={itemsPerPage}
-                />
-              </div>
-            )}
+          )}
+          
+          {registrations.length > itemsPerPage && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={getTotalPages(registrations, itemsPerPage)}
+                onPageChange={setCurrentPage}
+                totalItems={registrations.length}
+                itemsPerPage={itemsPerPage}
+              />
+            </div>
           )}
         </CardContent>
       </Card>
