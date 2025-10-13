@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  X
+  X,
+  Search
 } from 'lucide-react'
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -74,6 +75,11 @@ export default function BarangayDashboard() {
   const [claimsPage, setClaimsPage] = useState(1)
   const [residentsPage, setResidentsPage] = useState(1)
   const [itemsPerPage] = useState(5)
+  
+  // Search states
+  const [schedulesSearchTerm, setSchedulesSearchTerm] = useState('')
+  const [claimsSearchTerm, setClaimsSearchTerm] = useState('')
+  const [residentsSearchTerm, setResidentsSearchTerm] = useState('')
   const [newSchedule, setNewSchedule] = useState({
     title: '',
     description: '',
@@ -421,6 +427,40 @@ export default function BarangayDashboard() {
     return data.slice(startIndex, endIndex)
   }
 
+  // Search filtering functions
+  const getFilteredSchedules = () => {
+    if (!schedulesSearchTerm) return schedules
+    return schedules.filter((schedule: any) =>
+      schedule.title.toLowerCase().includes(schedulesSearchTerm.toLowerCase()) ||
+      schedule.description.toLowerCase().includes(schedulesSearchTerm.toLowerCase()) ||
+      schedule.location.toLowerCase().includes(schedulesSearchTerm.toLowerCase()) ||
+      schedule.status.toLowerCase().includes(schedulesSearchTerm.toLowerCase())
+    )
+  }
+
+  const getFilteredClaims = () => {
+    if (!claimsSearchTerm) return claims
+    return claims.filter((claim: any) =>
+      claim.schedule?.title.toLowerCase().includes(claimsSearchTerm.toLowerCase()) ||
+      claim.claimedByUser?.firstName.toLowerCase().includes(claimsSearchTerm.toLowerCase()) ||
+      claim.claimedByUser?.lastName.toLowerCase().includes(claimsSearchTerm.toLowerCase()) ||
+      claim.family?.head?.firstName.toLowerCase().includes(claimsSearchTerm.toLowerCase()) ||
+      claim.family?.head?.lastName.toLowerCase().includes(claimsSearchTerm.toLowerCase()) ||
+      claim.status.toLowerCase().includes(claimsSearchTerm.toLowerCase())
+    )
+  }
+
+  const getFilteredResidents = () => {
+    if (!residentsSearchTerm) return residents
+    return residents.filter((resident: any) =>
+      resident.firstName.toLowerCase().includes(residentsSearchTerm.toLowerCase()) ||
+      resident.lastName.toLowerCase().includes(residentsSearchTerm.toLowerCase()) ||
+      resident.email.toLowerCase().includes(residentsSearchTerm.toLowerCase()) ||
+      resident.phone.toLowerCase().includes(residentsSearchTerm.toLowerCase()) ||
+      (resident.isActive ? 'active' : 'inactive').includes(residentsSearchTerm.toLowerCase())
+    )
+  }
+
   const getTotalPages = (data: any[], itemsPerPage: number) => {
     return Math.ceil(data.length / itemsPerPage)
   }
@@ -471,7 +511,7 @@ export default function BarangayDashboard() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => router.push('/api/auth/signout')}
+                onClick={() => signOut({ callbackUrl: '/' })}
                 className="w-full sm:w-auto"
               >
                 Sign Out
@@ -638,17 +678,31 @@ export default function BarangayDashboard() {
           <TabsContent value="schedules" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                   <div>
                     <CardTitle>Donation Schedules</CardTitle>
                     <CardDescription>
                       Manage donation distribution schedules
                     </CardDescription>
                   </div>
-                  <Button onClick={() => setShowCreateSchedule(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Schedule
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search schedules..."
+                        value={schedulesSearchTerm}
+                        onChange={(e) => {
+                          setSchedulesSearchTerm(e.target.value)
+                          setSchedulesPage(1) // Reset to first page when searching
+                        }}
+                        className="pl-10 w-full sm:w-64"
+                      />
+                    </div>
+                    <Button onClick={() => setShowCreateSchedule(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Schedule
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -853,7 +907,7 @@ export default function BarangayDashboard() {
                 )}
 
                 <div className="space-y-6">
-                  {schedules.length === 0 ? (
+                  {getFilteredSchedules().length === 0 ? (
                     <div className="text-center py-8">
                       <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No Schedules Found</h3>
@@ -868,7 +922,7 @@ export default function BarangayDashboard() {
                     </div>
                   ) : (
                     <>
-                      {getPaginatedData(schedules, schedulesPage, itemsPerPage).map((schedule: any) => (
+                      {getPaginatedData(getFilteredSchedules(), schedulesPage, itemsPerPage).map((schedule: any) => (
                     <div key={schedule.id} className="border rounded-lg p-4 sm:p-6">
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-4 lg:space-y-0">
                         <div className="space-y-3 flex-1">
@@ -946,13 +1000,13 @@ export default function BarangayDashboard() {
                     </div>
                   ))}
                       
-                      {schedules.length > itemsPerPage && (
+                      {getFilteredSchedules().length > 0 && (
                         <div className="mt-6">
                           <Pagination
                             currentPage={schedulesPage}
-                            totalPages={getTotalPages(schedules, itemsPerPage)}
+                            totalPages={getTotalPages(getFilteredSchedules(), itemsPerPage)}
                             onPageChange={setSchedulesPage}
-                            totalItems={schedules.length}
+                            totalItems={getFilteredSchedules().length}
                             itemsPerPage={itemsPerPage}
                           />
                         </div>
@@ -967,14 +1021,30 @@ export default function BarangayDashboard() {
           <TabsContent value="claims" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Donation Claims</CardTitle>
-                <CardDescription>
-                  Track and verify donation claims
-                </CardDescription>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+                  <div>
+                    <CardTitle>Donation Claims</CardTitle>
+                    <CardDescription>
+                      Track and verify donation claims
+                    </CardDescription>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search claims..."
+                      value={claimsSearchTerm}
+                      onChange={(e) => {
+                        setClaimsSearchTerm(e.target.value)
+                        setClaimsPage(1) // Reset to first page when searching
+                      }}
+                      className="pl-10 w-full sm:w-64"
+                    />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {claims.length === 0 ? (
+                  {getFilteredClaims().length === 0 ? (
                     <div className="text-center py-8">
                       <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No Claims Found</h3>
@@ -982,7 +1052,7 @@ export default function BarangayDashboard() {
                     </div>
                   ) : (
                     <>
-                      {getPaginatedData(claims, claimsPage, itemsPerPage).map((claim: any) => {
+                      {getPaginatedData(getFilteredClaims(), claimsPage, itemsPerPage).map((claim: any) => {
                         const getStatusIcon = (status: string) => {
                           switch (status) {
                             case 'PENDING':
@@ -1079,13 +1149,13 @@ export default function BarangayDashboard() {
                         )
                       })}
                       
-                      {claims.length > itemsPerPage && (
+                      {getFilteredClaims().length > 0 && (
                         <div className="mt-6">
                           <Pagination
                             currentPage={claimsPage}
-                            totalPages={getTotalPages(claims, itemsPerPage)}
+                            totalPages={getTotalPages(getFilteredClaims(), itemsPerPage)}
                             onPageChange={setClaimsPage}
-                            totalItems={claims.length}
+                            totalItems={getFilteredClaims().length}
                             itemsPerPage={itemsPerPage}
                           />
                         </div>
@@ -1100,14 +1170,30 @@ export default function BarangayDashboard() {
           <TabsContent value="residents" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Registered Residents</CardTitle>
-                <CardDescription>
-                  View residents in your barangay
-                </CardDescription>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+                  <div>
+                    <CardTitle>Registered Residents</CardTitle>
+                    <CardDescription>
+                      View residents in your barangay
+                    </CardDescription>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search residents..."
+                      value={residentsSearchTerm}
+                      onChange={(e) => {
+                        setResidentsSearchTerm(e.target.value)
+                        setResidentsPage(1) // Reset to first page when searching
+                      }}
+                      className="pl-10 w-full sm:w-64"
+                    />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {residents.length === 0 ? (
+                  {getFilteredResidents().length === 0 ? (
                     <div className="text-center py-8">
                       <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No Residents Found</h3>
@@ -1115,7 +1201,7 @@ export default function BarangayDashboard() {
                     </div>
                   ) : (
                     <>
-                      {getPaginatedData(residents, residentsPage, itemsPerPage).map((resident: any) => (
+                      {getPaginatedData(getFilteredResidents(), residentsPage, itemsPerPage).map((resident: any) => (
                     <div key={resident.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center space-x-4">
                         <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center">
@@ -1143,13 +1229,13 @@ export default function BarangayDashboard() {
                     </div>
                   ))}
                       
-                      {residents.length > itemsPerPage && (
+                      {getFilteredResidents().length > 0 && (
                         <div className="mt-6">
                           <Pagination
                             currentPage={residentsPage}
-                            totalPages={getTotalPages(residents, itemsPerPage)}
+                            totalPages={getTotalPages(getFilteredResidents(), itemsPerPage)}
                             onPageChange={setResidentsPage}
-                            totalItems={residents.length}
+                            totalItems={getFilteredResidents().length}
                             itemsPerPage={itemsPerPage}
                           />
                         </div>

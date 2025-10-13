@@ -48,7 +48,16 @@ export default function Pagination({
   }
 
   if (totalPages <= 1) {
-    return null
+    return (
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-700">
+          Showing {startItem} to {endItem} of {totalItems} results
+        </div>
+        <div className="text-sm text-gray-500">
+          Page 1 of 1
+        </div>
+      </div>
+    )
   }
 
   return (
