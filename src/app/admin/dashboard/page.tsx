@@ -58,6 +58,17 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
   
+  // Report filter state
+  const [showReportFilters, setShowReportFilters] = useState(false)
+  const [reportType, setReportType] = useState<'donation' | 'analytics' | null>(null)
+  const [reportFormat, setReportFormat] = useState<'pdf' | 'excel' | null>(null)
+  const [reportFilters, setReportFilters] = useState({
+    barangayId: 'all',
+    startDate: '',
+    endDate: ''
+  })
+  const [allBarangays, setAllBarangays] = useState<any[]>([])
+  
   // User management state
   const [users, setUsers] = useState([])
   const [usersLoading, setUsersLoading] = useState(false)
@@ -96,8 +107,26 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (session?.user) {
       fetchDashboardData()
+      fetchBarangays()
     }
   }, [session])
+
+  const fetchBarangays = async () => {
+    try {
+      console.log('Fetching barangays for report filters...')
+      const response = await fetch('/api/admin/barangays')
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Barangays fetched:', data.length, data)
+        setAllBarangays(data || [])
+      } else {
+        const errorData = await response.json()
+        console.error('Error fetching barangays:', errorData)
+      }
+    } catch (error) {
+      console.error('Error fetching barangays:', error)
+    }
+  }
 
   const fetchDashboardData = async () => {
     try {
@@ -128,11 +157,32 @@ export default function AdminDashboard() {
     }
   }
 
-  const generateDonationReport = async (format: 'pdf' | 'excel') => {
+  const openReportFilters = (type: 'donation' | 'analytics', format: 'pdf' | 'excel') => {
+    setReportType(type)
+    setReportFormat(format)
+    setShowReportFilters(true)
+  }
+
+  const generateDonationReport = async (format: 'pdf' | 'excel', filters?: typeof reportFilters) => {
     setIsGeneratingReport(true)
     try {
       console.log('🔄 Generating donation report...')
-      const response = await fetch('/api/admin/reports/donations')
+      
+      // Build query parameters
+      const params = new URLSearchParams()
+      if (filters) {
+        if (filters.barangayId && filters.barangayId !== 'all') {
+          params.append('barangayId', filters.barangayId)
+        }
+        if (filters.startDate) {
+          params.append('startDate', filters.startDate)
+        }
+        if (filters.endDate) {
+          params.append('endDate', filters.endDate)
+        }
+      }
+      
+      const response = await fetch(`/api/admin/reports/donations?${params.toString()}`)
       
       if (!response.ok) {
         const errorData = await response.json()
@@ -144,7 +194,13 @@ export default function AdminDashboard() {
       const data = await response.json()
       console.log('✅ Report data received:', data)
       
-      const filename = `donation-report-${new Date().toISOString().split('T')[0]}`
+      const barangayName = filters?.barangayId && filters.barangayId !== 'all' 
+        ? allBarangays.find(b => b.id === filters.barangayId)?.name || ''
+        : 'All'
+      const dateRange = filters?.startDate && filters?.endDate 
+        ? `${filters.startDate}_to_${filters.endDate}`
+        : 'all-time'
+      const filename = `donation-report-${barangayName.replace(/\s+/g, '-')}-${dateRange}`
       
       if (format === 'pdf') {
         ReportGenerator.downloadPDF(data, filename)
@@ -153,6 +209,7 @@ export default function AdminDashboard() {
       }
       
       console.log('✅ Report generated successfully')
+      setShowReportFilters(false)
     } catch (error) {
       console.error('❌ Error generating donation report:', error)
       alert('An error occurred while generating the report. Please check the console for details.')
@@ -161,11 +218,26 @@ export default function AdminDashboard() {
     }
   }
 
-  const generateAnalyticsReport = async (format: 'pdf' | 'excel') => {
+  const generateAnalyticsReport = async (format: 'pdf' | 'excel', filters?: typeof reportFilters) => {
     setIsGeneratingReport(true)
     try {
       console.log('🔄 Generating analytics report...')
-      const response = await fetch('/api/admin/reports/analytics')
+      
+      // Build query parameters
+      const params = new URLSearchParams()
+      if (filters) {
+        if (filters.barangayId && filters.barangayId !== 'all') {
+          params.append('barangayId', filters.barangayId)
+        }
+        if (filters.startDate) {
+          params.append('startDate', filters.startDate)
+        }
+        if (filters.endDate) {
+          params.append('endDate', filters.endDate)
+        }
+      }
+      
+      const response = await fetch(`/api/admin/reports/analytics?${params.toString()}`)
       
       if (!response.ok) {
         const errorData = await response.json()
@@ -177,7 +249,13 @@ export default function AdminDashboard() {
       const data = await response.json()
       console.log('✅ Analytics data received:', data)
       
-      const filename = `analytics-report-${new Date().toISOString().split('T')[0]}`
+      const barangayName = filters?.barangayId && filters.barangayId !== 'all' 
+        ? allBarangays.find(b => b.id === filters.barangayId)?.name || ''
+        : 'All'
+      const dateRange = filters?.startDate && filters?.endDate 
+        ? `${filters.startDate}_to_${filters.endDate}`
+        : 'all-time'
+      const filename = `analytics-report-${barangayName.replace(/\s+/g, '-')}-${dateRange}`
       
       if (format === 'pdf') {
         ReportGenerator.downloadPDF(data, filename)
@@ -186,11 +264,22 @@ export default function AdminDashboard() {
       }
       
       console.log('✅ Analytics report generated successfully')
+      setShowReportFilters(false)
     } catch (error) {
       console.error('❌ Error generating analytics report:', error)
       alert('An error occurred while generating the report. Please check the console for details.')
     } finally {
       setIsGeneratingReport(false)
+    }
+  }
+
+  const handleGenerateReport = () => {
+    if (!reportType || !reportFormat) return
+    
+    if (reportType === 'donation') {
+      generateDonationReport(reportFormat, reportFilters)
+    } else {
+      generateAnalyticsReport(reportFormat, reportFilters)
     }
   }
 
@@ -453,7 +542,7 @@ export default function AdminDashboard() {
                       <Button 
                         variant="outline" 
                         className="w-full"
-                        onClick={() => generateDonationReport('pdf')}
+                        onClick={() => openReportFilters('donation', 'pdf')}
                         disabled={isGeneratingReport}
                       >
                         <Download className="h-4 w-4 mr-2" />
@@ -462,7 +551,7 @@ export default function AdminDashboard() {
                       <Button 
                         variant="outline" 
                         className="w-full"
-                        onClick={() => generateDonationReport('excel')}
+                        onClick={() => openReportFilters('donation', 'excel')}
                         disabled={isGeneratingReport}
                       >
                         <FileDown className="h-4 w-4 mr-2" />
@@ -481,7 +570,7 @@ export default function AdminDashboard() {
                       <Button 
                         variant="outline" 
                         className="w-full"
-                        onClick={() => generateAnalyticsReport('pdf')}
+                        onClick={() => openReportFilters('analytics', 'pdf')}
                         disabled={isGeneratingReport}
                       >
                         <Download className="h-4 w-4 mr-2" />
@@ -490,7 +579,7 @@ export default function AdminDashboard() {
                       <Button 
                         variant="outline" 
                         className="w-full"
-                        onClick={() => generateAnalyticsReport('excel')}
+                        onClick={() => openReportFilters('analytics', 'excel')}
                         disabled={isGeneratingReport}
                       >
                         <FileDown className="h-4 w-4 mr-2" />
@@ -511,6 +600,98 @@ export default function AdminDashboard() {
             <SMSSettings />
           </TabsContent>
         </Tabs>
+
+        {/* Report Filters Dialog */}
+        <Dialog open={showReportFilters} onOpenChange={(open) => {
+          setShowReportFilters(open)
+          if (open) {
+            // Refetch barangays when dialog opens to ensure fresh data
+            fetchBarangays()
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {reportType === 'donation' ? 'Donation Report' : 'Analytics Report'} - {reportFormat?.toUpperCase()}
+              </DialogTitle>
+              <DialogDescription>
+                Select filters for the report generation
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="barangay">Barangay</Label>
+                <Select
+                  value={reportFilters.barangayId}
+                  onValueChange={(value) => setReportFilters({...reportFilters, barangayId: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select barangay" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Barangays</SelectItem>
+                    {allBarangays && allBarangays.length > 0 ? (
+                      allBarangays.map((barangay) => (
+                        <SelectItem key={barangay.id} value={barangay.id}>
+                          {barangay.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        {allBarangays.length === 0 ? 'No barangays available. Please create barangays first.' : 'Loading...'}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {allBarangays.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    No barangays found. Make sure you have created barangays in the Barangays tab.
+                  </p>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={reportFilters.startDate}
+                    onChange={(e) => setReportFilters({...reportFilters, startDate: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endDate">End Date</Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={reportFilters.endDate}
+                    onChange={(e) => setReportFilters({...reportFilters, endDate: e.target.value})}
+                    min={reportFilters.startDate}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowReportFilters(false)
+                    setReportFilters({ barangayId: 'all', startDate: '', endDate: '' })
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleGenerateReport}
+                  disabled={isGeneratingReport}
+                >
+                  {isGeneratingReport ? 'Generating...' : 'Generate Report'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

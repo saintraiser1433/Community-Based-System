@@ -123,11 +123,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { title, description, date, startTime, endTime, location, maxRecipients } = await request.json()
+    const { title, description, date, startTime, endTime, location, maxRecipients, targetClassification, type } = await request.json()
 
     // Validate required fields
-    if (!title || !description || !date || !startTime || !endTime || !location) {
-      return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
+    if (!title || !description || !date || !startTime || !endTime || !location || !type) {
+      return NextResponse.json({ error: 'All required fields must be provided' }, { status: 400 })
     }
 
     // Validate date - must be today or future
@@ -162,7 +162,9 @@ export async function POST(request: NextRequest) {
         endTime,
         location,
         maxRecipients: maxRecipients ? parseInt(maxRecipients) : null,
-        status: 'SCHEDULED'
+        status: 'SCHEDULED',
+        targetClassification: targetClassification && targetClassification !== 'all' ? targetClassification : null,
+        type: type || 'GENERAL'
       }
     })
 
@@ -175,14 +177,17 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Send SMS notifications to all residents
+    // Send SMS notifications to eligible residents only
     try {
-      console.log('Sending SMS notifications to residents...')
+      console.log('Sending SMS notifications to eligible residents...')
       const notificationResult = await sendScheduleNotificationToResidents({
         title,
         message: description,
         scheduleId: schedule.id,
-        barangayId: user.barangayId
+        barangayId: user.barangayId,
+        targetClassification: targetClassification && targetClassification !== 'all' ? targetClassification : null,
+        type: type || 'GENERAL',
+        userId: session.user.id // Pass the actual user ID for audit logging
       })
 
       if (notificationResult.success) {

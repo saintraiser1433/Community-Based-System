@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Transform the data to include address and ID file path
+    // Transform the data to include all registration fields
     const transformedRegistrations = pendingRegistrations.map(registration => ({
       id: registration.id,
       firstName: registration.firstName,
@@ -43,8 +43,46 @@ export async function GET(request: NextRequest) {
       phone: registration.phone,
       address: registration.families[0]?.address || null,
       idFilePath: registration.idFilePath,
+      idBackFilePath: registration.idBackFilePath,
       createdAt: registration.createdAt,
-      barangay: registration.barangay
+      barangay: registration.barangay,
+      // Personal Information
+      gender: registration.gender,
+      dateOfBirth: registration.dateOfBirth,
+      purok: registration.purok,
+      municipality: registration.municipality,
+      // Residency Category
+      residencyCategory: registration.residencyCategory,
+      // Educational Background
+      educationalAttainment: registration.educationalAttainment,
+      lastSchoolAttended: registration.lastSchoolAttended,
+      yearLastAttended: registration.yearLastAttended,
+      // Household Information
+      numberOfHouseholdMembers: registration.numberOfHouseholdMembers,
+      numberOfDependents: registration.numberOfDependents,
+      isHeadOfFamily: registration.isHeadOfFamily,
+      housingType: registration.housingType,
+      barangayCertificatePath: registration.barangayCertificatePath,
+      // Occupational and Income Information
+      sourceOfIncome: registration.sourceOfIncome,
+      employmentType: registration.employmentType,
+      estimatedAnnualIncome: registration.estimatedAnnualIncome,
+      lowIncomeCertPath: registration.lowIncomeCertPath,
+      employmentCertPath: registration.employmentCertPath,
+      businessPermitPath: registration.businessPermitPath,
+      // Civil and Social Status
+      maritalStatus: registration.maritalStatus,
+      marriageContractPath: registration.marriageContractPath,
+      soloParentIdPath: registration.soloParentIdPath,
+      seniorCitizenIdPath: registration.seniorCitizenIdPath,
+      pwdIdPath: registration.pwdIdPath,
+      ipCertificatePath: registration.ipCertificatePath,
+      schoolIdPath: registration.schoolIdPath,
+      outOfSchoolYouthCertPath: registration.outOfSchoolYouthCertPath,
+      // Supporting Documents
+      barangayClearancePath: registration.barangayClearancePath,
+      certificateOfIndigencyPath: registration.certificateOfIndigencyPath,
+      proofOfResidencyPath: registration.proofOfResidencyPath,
     }))
 
     return NextResponse.json(transformedRegistrations)

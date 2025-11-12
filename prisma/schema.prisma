@@ -38,6 +38,77 @@ enum FamilyMemberRelation {
   OTHER
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ResidencyCategory {
+  BONAFIDE_RESIDENT
+  BONAFIDE_RESIDENT_IP
+  TRANSIENT_RESIDENT
+  TRANSFERRED_RESIDENT
+}
+
+enum EducationalAttainment {
+  NO_FORMAL_EDUCATION
+  ELEMENTARY_LEVEL
+  ELEMENTARY_GRADUATE
+  HIGH_SCHOOL_LEVEL
+  HIGH_SCHOOL_GRADUATE
+  SENIOR_HIGH_SCHOOL
+  VOCATIONAL_TESDA
+  COLLEGE_LEVEL
+  COLLEGE_GRADUATE
+  POST_GRADUATE
+}
+
+enum HousingType {
+  OWNED
+  RENTED
+  SHARED
+}
+
+enum EmploymentType {
+  PERMANENT
+  CONTRACTUAL
+  PART_TIME
+  SEASONAL
+  UNEMPLOYED
+}
+
+enum AnnualIncome {
+  BELOW_50000
+  BETWEEN_50000_100000
+  BETWEEN_100001_200000
+  ABOVE_200000
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  WIDOWED
+  SOLO_PARENT
+}
+
+enum FamilyClassification {
+  HIGH_CLASS
+  MIDDLE_CLASS
+  LOW_CLASS
+  UNCLASSIFIED
+}
+
+enum DonationType {
+  GENERAL
+  EDUCATION
+  WHEELCHAIR
+  PWD
+  IP
+  SENIOR_CITIZEN
+  SOLO_PARENT
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -53,7 +124,58 @@ model User {
   // Resident specific fields
   barangayId String?
   barangay   Barangay? @relation(fields: [barangayId], references: [id])
-  idFilePath String?   // Path to uploaded ID file
+  
+  // Personal Information
+  gender      Gender?
+  dateOfBirth DateTime?
+  purok       String?  // Purok/Sitio
+  municipality String? // Municipality
+  
+  // Residency Category
+  residencyCategory ResidencyCategory?
+  
+  // Educational Background
+  educationalAttainment EducationalAttainment?
+  lastSchoolAttended   String?
+  yearLastAttended     String?
+  
+  // Household Information
+  numberOfHouseholdMembers Int?
+  numberOfDependents       Int?
+  isHeadOfFamily           Boolean? @default(false)
+  housingType              HousingType?
+  barangayCertificatePath  String?  // Barangay Certificate of Residency
+  
+  // Occupational and Income Information
+  sourceOfIncome     String?
+  employmentType     EmploymentType?
+  estimatedAnnualIncome AnnualIncome?
+  lowIncomeCertPath  String?  // Certificate of Low Income
+  employmentCertPath String?  // Certificate of Employment or Payslip
+  businessPermitPath String?  // Business Permit
+  
+  // Civil and Social Status
+  maritalStatus      MaritalStatus?
+  marriageContractPath String?  // Marriage Contract
+  soloParentIdPath   String?    // Solo Parent ID
+  seniorCitizenIdPath String?   // Senior Citizen ID
+  pwdIdPath          String?    // PWD ID
+  ipCertificatePath String?     // Certificate of Indigency / Tribal Certificate
+  schoolIdPath       String?     // School ID or Certificate of Enrollment
+  outOfSchoolYouthCertPath String? // Certificate from Barangay or DSWD
+  
+  // Supporting Documents
+  barangayClearancePath String?  // Barangay Clearance (latest)
+  certificateOfIndigencyPath String? // Certificate of Indigency
+  proofOfResidencyPath String?  // Proof of Residency
+  
+  // Valid ID (existing)
+  idFilePath String?   // Path to uploaded ID file (front & back)
+  idBackFilePath String? // Path to uploaded ID back
+  
+  // Family Classification (for barangay managers)
+  familyClassification FamilyClassification? @default(UNCLASSIFIED)
+  
   families   Family[]
   claims     Claim[] @relation("ClaimedByUser")
   verifiedClaims Claim[] @relation("VerifiedByUser")
@@ -134,6 +256,10 @@ model DonationSchedule {
   status      DonationStatus @default(SCHEDULED)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+
+  // Classification and Type filtering
+  targetClassification FamilyClassification? // null means "all classes"
+  type                 DonationType          @default(GENERAL)
 
   // Relations
   claims Claim[]

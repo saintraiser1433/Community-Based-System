@@ -15,6 +15,9 @@ export interface NotificationData {
   message: string
   scheduleId: string
   barangayId: string
+  targetClassification?: string | null
+  type?: string
+  userId?: string // User ID for audit logging
 }
 
 export interface SMSNotificationResult {
@@ -54,20 +57,29 @@ export const sendScheduleNotificationToResidents = async (
       }
     }
 
-    // Get all active residents in the barangay
-    console.log('Querying residents for barangay:', notificationData.barangayId)
+    // Build where clause for filtering residents
+    const whereClause: any = {
+      barangayId: notificationData.barangayId,
+      role: 'RESIDENT',
+      isActive: true,
+      phone: { not: null }
+    }
+
+    // Filter by classification if specified
+    if (notificationData.targetClassification) {
+      whereClause.familyClassification = notificationData.targetClassification
+    }
+
+    // Get all active residents in the barangay (filtered by classification if specified)
+    console.log('Querying residents for barangay:', notificationData.barangayId, 'with classification:', notificationData.targetClassification || 'all')
     const residents = await prisma.user.findMany({
-      where: {
-        barangayId: notificationData.barangayId,
-        role: 'RESIDENT',
-        isActive: true,
-        phone: { not: null }
-      },
+      where: whereClause,
       select: {
         id: true,
         firstName: true,
         lastName: true,
-        phone: true
+        phone: true,
+        familyClassification: true
       }
     })
 
@@ -176,14 +188,21 @@ export const sendScheduleNotificationToResidents = async (
     if (smsResult.success) {
       console.log('SMS sent successfully to all residents')
       
-      // Log notification in audit log
-      await prisma.auditLog.create({
-        data: {
-          userId: 'system', // System-generated notification
-          action: 'SMS_NOTIFICATION_SENT',
-          details: `SMS notification sent to ${phoneNumbers.length} residents for schedule: ${notificationData.title}`
+      // Log notification in audit log (only if userId is provided)
+      if (notificationData.userId) {
+        try {
+          await prisma.auditLog.create({
+            data: {
+              userId: notificationData.userId,
+              action: 'SMS_NOTIFICATION_SENT',
+              details: `SMS notification sent to ${phoneNumbers.length} residents for schedule: ${notificationData.title}`
+            }
+          })
+        } catch (auditError) {
+          // Don't fail SMS notification if audit log fails
+          console.error('Failed to create audit log:', auditError)
         }
-      })
+      }
 
       return {
         success: true,
@@ -327,14 +346,9 @@ export const sendScheduleCancellationNotification = async (
     if (smsResult.success) {
       console.log('Cancellation SMS sent successfully to all residents')
       
-      // Log notification in audit log
-      await prisma.auditLog.create({
-        data: {
-          userId: 'system',
-          action: 'SMS_CANCELLATION_SENT',
-          details: `Cancellation SMS sent to ${phoneNumbers.length} residents for schedule: ${schedule.title}`
-        }
-      })
+      // Log notification in audit log (skip if no userId provided)
+      // Note: This function doesn't receive userId, so we skip audit logging
+      // The cancellation is logged when the schedule status is updated
 
       return {
         success: true,

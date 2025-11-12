@@ -7,6 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.formData()
     const file: File | null = data.get('file') as unknown as File
+    const field = data.get('field') as string || 'documents'
 
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
@@ -28,8 +29,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Determine subdirectory based on field type
+    let subDir = 'documents'
+    if (field.includes('id')) {
+      subDir = 'ids'
+    } else if (field.includes('certificate') || field.includes('cert')) {
+      subDir = 'certificates'
+    } else if (field.includes('clearance')) {
+      subDir = 'clearances'
+    } else if (field.includes('contract') || field.includes('permit')) {
+      subDir = 'contracts'
+    }
+
     // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'ids')
+    const uploadsDir = join(process.cwd(), 'public', 'uploads', subDir)
     if (!existsSync(uploadsDir)) {
       await mkdir(uploadsDir, { recursive: true })
     }
@@ -47,7 +60,7 @@ export async function POST(request: NextRequest) {
     await writeFile(filePath, buffer)
 
     // Return the relative path for database storage
-    const relativePath = `/uploads/ids/${fileName}`
+    const relativePath = `/uploads/${subDir}/${fileName}`
 
     return NextResponse.json({ 
       success: true, 

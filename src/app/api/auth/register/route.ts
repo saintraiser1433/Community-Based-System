@@ -4,7 +4,64 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const { firstName, lastName, email, phone, password, address, barangayId, idFilePath, role = 'RESIDENT' } = await request.json()
+    const {
+      // Basic info
+      firstName,
+      lastName,
+      email,
+      phone,
+      password,
+      barangayId,
+      role = 'RESIDENT',
+      
+      // Personal Information
+      gender,
+      dateOfBirth,
+      purok,
+      municipality,
+      
+      // Residency Category
+      residencyCategory,
+      
+      // Educational Background
+      educationalAttainment,
+      lastSchoolAttended,
+      yearLastAttended,
+      
+      // Household Information
+      numberOfHouseholdMembers,
+      numberOfDependents,
+      isHeadOfFamily,
+      housingType,
+      barangayCertificatePath,
+      
+      // Occupational and Income Information
+      sourceOfIncome,
+      employmentType,
+      estimatedAnnualIncome,
+      lowIncomeCertPath,
+      employmentCertPath,
+      businessPermitPath,
+      
+      // Civil and Social Status
+      maritalStatus,
+      marriageContractPath,
+      soloParentIdPath,
+      seniorCitizenIdPath,
+      pwdIdPath,
+      ipCertificatePath,
+      schoolIdPath,
+      outOfSchoolYouthCertPath,
+      
+      // Supporting Documents
+      barangayClearancePath,
+      certificateOfIndigencyPath,
+      proofOfResidencyPath,
+      
+      // Valid ID
+      idFilePath,
+      idBackFilePath,
+    } = await request.json()
 
     // Only allow resident registration through this endpoint
     if (role !== 'RESIDENT') {
@@ -52,18 +109,69 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
+    // Construct address from purok, barangay, and municipality
+    const addressParts = [purok, barangay.name, municipality].filter(Boolean)
+    const address = addressParts.join(', ')
+
     // Create user (inactive by default for residents)
     const user = await prisma.user.create({
       data: {
         firstName,
         lastName,
         email,
-        phone: formattedPhone, // Store formatted phone number
+        phone: formattedPhone,
         password: hashedPassword,
         role: 'RESIDENT',
         isActive: false, // Inactive until approved by admin
         barangayId,
-        idFilePath // Store the uploaded ID file path
+        
+        // Personal Information
+        gender: gender && gender !== '' ? gender : null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        purok: purok && purok !== '' ? purok : null,
+        municipality: municipality && municipality !== '' ? municipality : null,
+        
+        // Residency Category
+        residencyCategory: residencyCategory && residencyCategory !== '' ? residencyCategory : null,
+        
+        // Educational Background
+        educationalAttainment: educationalAttainment && educationalAttainment !== '' ? educationalAttainment : null,
+        lastSchoolAttended: lastSchoolAttended && lastSchoolAttended !== '' ? lastSchoolAttended : null,
+        yearLastAttended: yearLastAttended && yearLastAttended !== '' ? yearLastAttended : null,
+        
+        // Household Information
+        numberOfHouseholdMembers: numberOfHouseholdMembers && numberOfHouseholdMembers !== '' ? parseInt(String(numberOfHouseholdMembers)) : null,
+        numberOfDependents: numberOfDependents && numberOfDependents !== '' ? parseInt(String(numberOfDependents)) : null,
+        isHeadOfFamily: isHeadOfFamily === true || isHeadOfFamily === 'true',
+        housingType: housingType && housingType !== '' ? housingType : null,
+        barangayCertificatePath: barangayCertificatePath || null,
+        
+        // Occupational and Income Information
+        sourceOfIncome: sourceOfIncome && sourceOfIncome !== '' ? sourceOfIncome : null,
+        employmentType: employmentType && employmentType !== '' ? employmentType : null,
+        estimatedAnnualIncome: estimatedAnnualIncome && estimatedAnnualIncome !== '' ? estimatedAnnualIncome : null,
+        lowIncomeCertPath: lowIncomeCertPath || null,
+        employmentCertPath: employmentCertPath || null,
+        businessPermitPath: businessPermitPath || null,
+        
+        // Civil and Social Status
+        maritalStatus: maritalStatus && maritalStatus !== '' ? maritalStatus : null,
+        marriageContractPath: marriageContractPath || null,
+        soloParentIdPath: soloParentIdPath || null,
+        seniorCitizenIdPath: seniorCitizenIdPath || null,
+        pwdIdPath: pwdIdPath || null,
+        ipCertificatePath: ipCertificatePath || null,
+        schoolIdPath: schoolIdPath || null,
+        outOfSchoolYouthCertPath: outOfSchoolYouthCertPath || null,
+        
+        // Supporting Documents
+        barangayClearancePath: barangayClearancePath || null,
+        certificateOfIndigencyPath: certificateOfIndigencyPath || null,
+        proofOfResidencyPath: proofOfResidencyPath || null,
+        
+        // Valid ID
+        idFilePath: idFilePath || null,
+        idBackFilePath: idBackFilePath || null,
       }
     })
 
@@ -72,7 +180,7 @@ export async function POST(request: NextRequest) {
       data: {
         headId: user.id,
         barangayId,
-        address
+        address: address || 'Address not provided'
       }
     })
 
@@ -80,10 +188,25 @@ export async function POST(request: NextRequest) {
       { message: 'Registration submitted successfully. Please wait for admin approval.', userId: user.id },
       { status: 201 }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Registration error:', error)
+    
+    // Provide more detailed error messages
+    let errorMessage = 'Internal server error'
+    
+    if (error.code === 'P2002') {
+      errorMessage = 'A user with this email already exists'
+    } else if (error.code === 'P2003') {
+      errorMessage = 'Invalid reference. Please check your barangay selection.'
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
       { status: 500 }
     )
   }

@@ -26,7 +26,8 @@ import {
   Edit,
   Trash2,
   X,
-  Search
+  Search,
+  Tag
 } from 'lucide-react'
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -80,6 +81,13 @@ export default function BarangayDashboard() {
   const [schedulesSearchTerm, setSchedulesSearchTerm] = useState('')
   const [claimsSearchTerm, setClaimsSearchTerm] = useState('')
   const [residentsSearchTerm, setResidentsSearchTerm] = useState('')
+  
+  // Classification states
+  const [classifiedResidents, setClassifiedResidents] = useState<any[]>([])
+  const [classificationSearchTerm, setClassificationSearchTerm] = useState('')
+  const [selectedClassification, setSelectedClassification] = useState<string>('all')
+  const [residentToClassify, setResidentToClassify] = useState<any>(null)
+  const [showClassifyModal, setShowClassifyModal] = useState(false)
   const [newSchedule, setNewSchedule] = useState({
     title: '',
     description: '',
@@ -87,7 +95,9 @@ export default function BarangayDashboard() {
     startTime: '',
     endTime: '',
     location: '',
-    maxRecipients: ''
+    maxRecipients: '',
+    targetClassification: 'all', // 'all', 'HIGH_CLASS', 'MIDDLE_CLASS', 'LOW_CLASS'
+    type: 'GENERAL' // 'GENERAL', 'EDUCATION', 'WHEELCHAIR', 'PWD', 'IP', 'SENIOR_CITIZEN', 'SOLO_PARENT'
   })
 
   useEffect(() => {
@@ -123,11 +133,44 @@ export default function BarangayDashboard() {
       if (residentsResponse.ok) {
         const residentsData = await residentsResponse.json()
         setResidents(residentsData)
+        setClassifiedResidents(residentsData) // Also set for classification tab
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const updateClassification = async (residentId: string, classification: string) => {
+    setLoading(true)
+    try {
+      const response = await fetch('/api/barangay/classify-resident', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          residentId, 
+          classification: classification || 'UNCLASSIFIED'
+        })
+      })
+
+      if (response.ok) {
+        toast.success('Family classification updated successfully')
+        await fetchDashboardData() // Refresh data
+        setShowClassifyModal(false)
+        setResidentToClassify(null)
+      } else {
+        const error = await response.json()
+        const errorMsg = error.error || 'Failed to update classification'
+        const details = error.details ? ` Details: ${error.details}` : ''
+        toast.error(`${errorMsg}${details}`)
+        console.error('Classification update error:', error)
+      }
+    } catch (error) {
+      console.error('Error updating classification:', error)
+      toast.error('An error occurred while updating classification')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -223,7 +266,9 @@ export default function BarangayDashboard() {
           startTime: '',
           endTime: '',
           location: '',
-          maxRecipients: ''
+          maxRecipients: '',
+          targetClassification: 'all',
+          type: 'GENERAL'
         })
         await fetchDashboardData()
         toast.success('Schedule updated successfully')
@@ -474,7 +519,9 @@ export default function BarangayDashboard() {
       startTime: schedule.startTime,
       endTime: schedule.endTime,
       location: schedule.location,
-      maxRecipients: schedule.maxRecipients?.toString() || ''
+      maxRecipients: schedule.maxRecipients?.toString() || '',
+      targetClassification: schedule.targetClassification || 'all',
+      type: schedule.type || 'GENERAL'
     })
     setShowEditSchedule(true)
   }
@@ -530,7 +577,7 @@ export default function BarangayDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto">
             <TabsTrigger value="overview" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Home className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Overview</span>
@@ -546,6 +593,10 @@ export default function BarangayDashboard() {
             <TabsTrigger value="residents" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Users className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Residents</span>
+            </TabsTrigger>
+            <TabsTrigger value="classification" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
+              <Tag className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">Classification</span>
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <BarChart3 className="h-4 w-4" />
@@ -792,6 +843,55 @@ export default function BarangayDashboard() {
                           />
                         </div>
 
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="type">Donation Type *</Label>
+                            <Select
+                              value={newSchedule.type}
+                              onValueChange={(value) => setNewSchedule({...newSchedule, type: value})}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select donation type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="GENERAL">General</SelectItem>
+                                <SelectItem value="EDUCATION">Education (School Supplies)</SelectItem>
+                                <SelectItem value="WHEELCHAIR">Wheelchair</SelectItem>
+                                <SelectItem value="PWD">PWD (Persons with Disabilities)</SelectItem>
+                                <SelectItem value="IP">IP (Indigenous People)</SelectItem>
+                                <SelectItem value="SENIOR_CITIZEN">Senior Citizen</SelectItem>
+                                <SelectItem value="SOLO_PARENT">Solo Parent</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-gray-500">
+                              {newSchedule.type === 'EDUCATION' && 'All students (including family members) can claim'}
+                              {newSchedule.type === 'WHEELCHAIR' && 'For PWD and IP members'}
+                              {newSchedule.type === 'PWD' && 'For Persons with Disabilities'}
+                              {newSchedule.type === 'IP' && 'For Indigenous People'}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="targetClassification">Target Classification *</Label>
+                            <Select
+                              value={newSchedule.targetClassification}
+                              onValueChange={(value) => setNewSchedule({...newSchedule, targetClassification: value})}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select target classification" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Classes</SelectItem>
+                                <SelectItem value="HIGH_CLASS">High Class Only</SelectItem>
+                                <SelectItem value="MIDDLE_CLASS">Middle Class Only</SelectItem>
+                                <SelectItem value="LOW_CLASS">Low Class Only</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-gray-500">
+                              Only selected class will receive SMS and see this schedule
+                            </p>
+                          </div>
+                        </div>
+
                         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                           <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                             {loading ? 'Creating...' : 'Create Schedule'}
@@ -891,6 +991,46 @@ export default function BarangayDashboard() {
                             onChange={(e) => setNewSchedule({ ...newSchedule, maxRecipients: e.target.value })}
                             placeholder="Enter maximum number of recipients"
                           />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-type">Donation Type *</Label>
+                            <Select
+                              value={newSchedule.type}
+                              onValueChange={(value) => setNewSchedule({...newSchedule, type: value})}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select donation type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="GENERAL">General</SelectItem>
+                                <SelectItem value="EDUCATION">Education (School Supplies)</SelectItem>
+                                <SelectItem value="WHEELCHAIR">Wheelchair</SelectItem>
+                                <SelectItem value="PWD">PWD (Persons with Disabilities)</SelectItem>
+                                <SelectItem value="IP">IP (Indigenous People)</SelectItem>
+                                <SelectItem value="SENIOR_CITIZEN">Senior Citizen</SelectItem>
+                                <SelectItem value="SOLO_PARENT">Solo Parent</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-targetClassification">Target Classification *</Label>
+                            <Select
+                              value={newSchedule.targetClassification}
+                              onValueChange={(value) => setNewSchedule({...newSchedule, targetClassification: value})}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select target classification" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Classes</SelectItem>
+                                <SelectItem value="HIGH_CLASS">High Class Only</SelectItem>
+                                <SelectItem value="MIDDLE_CLASS">Middle Class Only</SelectItem>
+                                <SelectItem value="LOW_CLASS">Low Class Only</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
 
                         <div className="flex space-x-2">
@@ -1242,6 +1382,248 @@ export default function BarangayDashboard() {
                       )}
                     </>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="classification" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+                  <div>
+                    <CardTitle>Family Classification</CardTitle>
+                    <CardDescription>
+                      Classify residents into High Class, Middle Class, or Low Class families
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Select value={selectedClassification} onValueChange={setSelectedClassification}>
+                      <SelectTrigger className="w-full sm:w-48">
+                        <SelectValue placeholder="Filter by classification" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Classifications</SelectItem>
+                        <SelectItem value="HIGH_CLASS">High Class</SelectItem>
+                        <SelectItem value="MIDDLE_CLASS">Middle Class</SelectItem>
+                        <SelectItem value="LOW_CLASS">Low Class</SelectItem>
+                        <SelectItem value="UNCLASSIFIED">Unclassified</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search residents..."
+                        value={classificationSearchTerm}
+                        onChange={(e) => setClassificationSearchTerm(e.target.value)}
+                        className="pl-10 w-full sm:w-64"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {(() => {
+                    const filtered = classifiedResidents.filter((resident: any) => {
+                      const matchesSearch = 
+                        resident.firstName?.toLowerCase().includes(classificationSearchTerm.toLowerCase()) ||
+                        resident.lastName?.toLowerCase().includes(classificationSearchTerm.toLowerCase()) ||
+                        resident.email?.toLowerCase().includes(classificationSearchTerm.toLowerCase())
+                      const matchesClassification = 
+                        selectedClassification === 'all' || 
+                        resident.familyClassification === selectedClassification ||
+                        (!resident.familyClassification && selectedClassification === 'UNCLASSIFIED')
+                      return matchesSearch && matchesClassification
+                    })
+
+                    const groupedByClassification = {
+                      HIGH_CLASS: filtered.filter((r: any) => r.familyClassification === 'HIGH_CLASS'),
+                      MIDDLE_CLASS: filtered.filter((r: any) => r.familyClassification === 'MIDDLE_CLASS'),
+                      LOW_CLASS: filtered.filter((r: any) => r.familyClassification === 'LOW_CLASS'),
+                      UNCLASSIFIED: filtered.filter((r: any) => !r.familyClassification || r.familyClassification === 'UNCLASSIFIED')
+                    }
+
+                    return (
+                      <div className="space-y-6">
+                        {/* High Class */}
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-green-700 flex items-center space-x-2">
+                              <Users className="h-5 w-5" />
+                              <span>High Class Families ({groupedByClassification.HIGH_CLASS.length})</span>
+                            </h3>
+                          </div>
+                          <div className="space-y-3">
+                            {groupedByClassification.HIGH_CLASS.length === 0 ? (
+                              <p className="text-sm text-gray-500 text-center py-4">No high class families</p>
+                            ) : (
+                              groupedByClassification.HIGH_CLASS.map((resident: any) => (
+                                <div key={resident.id} className="flex items-center justify-between p-4 border rounded-lg bg-green-50">
+                                  <div className="flex items-center space-x-4">
+                                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                      <Users className="h-5 w-5 text-green-600" />
+                                    </div>
+                                    <div>
+                                      <h3 className="font-semibold">{resident.firstName} {resident.lastName}</h3>
+                                      <p className="text-sm text-gray-600">{resident.email}</p>
+                                      <p className="text-sm text-gray-500">{resident.phone}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge className="bg-green-600">High Class</Badge>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setResidentToClassify(resident)
+                                        setShowClassifyModal(true)
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Reclassify
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Middle Class */}
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-blue-700 flex items-center space-x-2">
+                              <Users className="h-5 w-5" />
+                              <span>Middle Class Families ({groupedByClassification.MIDDLE_CLASS.length})</span>
+                            </h3>
+                          </div>
+                          <div className="space-y-3">
+                            {groupedByClassification.MIDDLE_CLASS.length === 0 ? (
+                              <p className="text-sm text-gray-500 text-center py-4">No middle class families</p>
+                            ) : (
+                              groupedByClassification.MIDDLE_CLASS.map((resident: any) => (
+                                <div key={resident.id} className="flex items-center justify-between p-4 border rounded-lg bg-blue-50">
+                                  <div className="flex items-center space-x-4">
+                                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                      <Users className="h-5 w-5 text-blue-600" />
+                                    </div>
+                                    <div>
+                                      <h3 className="font-semibold">{resident.firstName} {resident.lastName}</h3>
+                                      <p className="text-sm text-gray-600">{resident.email}</p>
+                                      <p className="text-sm text-gray-500">{resident.phone}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge className="bg-blue-600">Middle Class</Badge>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setResidentToClassify(resident)
+                                        setShowClassifyModal(true)
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Reclassify
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Low Class */}
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-orange-700 flex items-center space-x-2">
+                              <Users className="h-5 w-5" />
+                              <span>Low Class Families ({groupedByClassification.LOW_CLASS.length})</span>
+                            </h3>
+                          </div>
+                          <div className="space-y-3">
+                            {groupedByClassification.LOW_CLASS.length === 0 ? (
+                              <p className="text-sm text-gray-500 text-center py-4">No low class families</p>
+                            ) : (
+                              groupedByClassification.LOW_CLASS.map((resident: any) => (
+                                <div key={resident.id} className="flex items-center justify-between p-4 border rounded-lg bg-orange-50">
+                                  <div className="flex items-center space-x-4">
+                                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                                      <Users className="h-5 w-5 text-orange-600" />
+                                    </div>
+                                    <div>
+                                      <h3 className="font-semibold">{resident.firstName} {resident.lastName}</h3>
+                                      <p className="text-sm text-gray-600">{resident.email}</p>
+                                      <p className="text-sm text-gray-500">{resident.phone}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge className="bg-orange-600">Low Class</Badge>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setResidentToClassify(resident)
+                                        setShowClassifyModal(true)
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Reclassify
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Unclassified */}
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-700 flex items-center space-x-2">
+                              <Users className="h-5 w-5" />
+                              <span>Unclassified Families ({groupedByClassification.UNCLASSIFIED.length})</span>
+                            </h3>
+                          </div>
+                          <div className="space-y-3">
+                            {groupedByClassification.UNCLASSIFIED.length === 0 ? (
+                              <p className="text-sm text-gray-500 text-center py-4">All families are classified</p>
+                            ) : (
+                              groupedByClassification.UNCLASSIFIED.map((resident: any) => (
+                                <div key={resident.id} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                                  <div className="flex items-center space-x-4">
+                                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                                      <Users className="h-5 w-5 text-gray-600" />
+                                    </div>
+                                    <div>
+                                      <h3 className="font-semibold">{resident.firstName} {resident.lastName}</h3>
+                                      <p className="text-sm text-gray-600">{resident.email}</p>
+                                      <p className="text-sm text-gray-500">{resident.phone}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge variant="outline">Unclassified</Badge>
+                                    <Button 
+                                      variant="default" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setResidentToClassify(resident)
+                                        setShowClassifyModal(true)
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Classify
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -1601,6 +1983,62 @@ export default function BarangayDashboard() {
                 className="w-full sm:w-auto order-1 sm:order-2"
               >
                 {loading ? 'Processing...' : 'Claim for Family Member'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Classification Modal */}
+      <Dialog open={showClassifyModal} onOpenChange={setShowClassifyModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Classify Family</DialogTitle>
+            <DialogDescription>
+              Select the classification for {residentToClassify?.firstName} {residentToClassify?.lastName}'s family
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="classification">Family Classification</Label>
+              <Select
+                value={residentToClassify?.familyClassification || 'UNCLASSIFIED'}
+                onValueChange={(value) => {
+                  if (residentToClassify) {
+                    setResidentToClassify({ ...residentToClassify, familyClassification: value })
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select classification" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="HIGH_CLASS">High Class</SelectItem>
+                  <SelectItem value="MIDDLE_CLASS">Middle Class</SelectItem>
+                  <SelectItem value="LOW_CLASS">Low Class</SelectItem>
+                  <SelectItem value="UNCLASSIFIED">Unclassified</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => {
+                setShowClassifyModal(false)
+                setResidentToClassify(null)
+              }}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (residentToClassify) {
+                    updateClassification(
+                      residentToClassify.id, 
+                      residentToClassify.familyClassification || 'UNCLASSIFIED'
+                    )
+                  }
+                }}
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : 'Update Classification'}
               </Button>
             </div>
           </div>

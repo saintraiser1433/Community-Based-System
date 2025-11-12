@@ -78,7 +78,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { title, description, date, startTime, endTime, location, maxRecipients, status } = await request.json()
+    const { title, description, date, startTime, endTime, location, maxRecipients, status, targetClassification, type } = await request.json()
 
     // Check if this is a status-only update (for Mark as Distributed/Cancel actions)
     const isStatusOnlyUpdate = !title && !description && !date && !startTime && !endTime && !location && status
@@ -136,7 +136,9 @@ export async function PUT(
           endTime,
           location,
           maxRecipients: maxRecipients ? parseInt(maxRecipients) : null,
-          status
+          status,
+          targetClassification: targetClassification && targetClassification !== 'all' ? targetClassification : null,
+          type: type || 'GENERAL'
         }
 
     const schedule = await prisma.donationSchedule.update({
