@@ -99,6 +99,18 @@ enum FamilyClassification {
   UNCLASSIFIED
 }
 
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MemberEducationLevel {
+  ELEMENTARY
+  HIGH_SCHOOL
+  COLLEGE
+}
+
 enum DonationType {
   GENERAL
   EDUCATION
@@ -237,6 +249,18 @@ model FamilyMember {
   name     String
   relation FamilyMemberRelation
   age      Int?
+  isIndigent Boolean @default(false)
+  indigencyCertPath String?
+  indigentVerificationStatus VerificationStatus?
+  isSeniorCitizen Boolean @default(false)
+  seniorCardPath String?
+  seniorVerificationStatus VerificationStatus?
+  isPWD Boolean @default(false)
+  pwdProofPath String?
+  pwdVerificationStatus VerificationStatus?
+  isStudent Boolean @default(false)
+  studentIdPath String?
+  educationLevel MemberEducationLevel?
   createdAt DateTime @default(now())
 
   @@map("family_members")

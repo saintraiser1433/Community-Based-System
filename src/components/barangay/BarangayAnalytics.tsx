@@ -34,10 +34,14 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import Pagination from '@/components/ui/pagination'
 
 interface BarangayAnalytics {
   overview: {
     totalResidents: number
+    totalFamilyMembers: number
+    totalPopulation: number
     totalSchedules: number
     totalClaims: number
     upcomingSchedules: number
@@ -83,11 +87,37 @@ interface BarangayAnalytics {
     totalClaims: number
     registrationDate: string
   }>
+  populationDetails: {
+    residents: Array<{
+      id: string
+      name: string
+      email: string
+      phone: string
+      families: Array<{
+        id: string
+        address: string
+        membersCount: number
+      }>
+    }>
+    familyMembers: Array<{
+      id: string
+      name: string
+      relation: string
+      familyId: string
+      familyAddress: string
+      headName: string
+    }>
+  }
 }
 
 export default function BarangayAnalytics() {
   const [analytics, setAnalytics] = useState<BarangayAnalytics | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [populationDialogOpen, setPopulationDialogOpen] = useState(false)
+  const [populationDialogTitle, setPopulationDialogTitle] = useState('')
+  const [populationView, setPopulationView] = useState<'residents' | 'members'>('residents')
+  const [populationResidentsPage, setPopulationResidentsPage] = useState(1)
+  const [populationMembersPage, setPopulationMembersPage] = useState(1)
 
   useEffect(() => {
     fetchAnalytics()
@@ -116,6 +146,15 @@ export default function BarangayAnalytics() {
       setIsLoading(false)
     }
   }
+
+  const getPaginatedData = <T,>(data: T[], page: number, itemsPerPage: number) => {
+    const startIndex = (page - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return data.slice(startIndex, endIndex)
+  }
+
+  const getTotalPages = (totalItems: number, itemsPerPage: number) =>
+    Math.max(1, Math.ceil(totalItems / itemsPerPage))
 
   if (isLoading) {
     return (
@@ -152,13 +191,39 @@ export default function BarangayAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Residents</CardTitle>
+            <CardTitle className="text-sm font-medium">Residents (Heads)</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.overview.totalResidents}</div>
             <p className="text-xs text-muted-foreground">
-              Registered residents
+              Registered heads of family
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Family Members</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.overview.totalFamilyMembers}</div>
+            <p className="text-xs text-muted-foreground">
+              Members in registered families
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Population</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.overview.totalPopulation}</div>
+            <p className="text-xs text-muted-foreground">
+              Residents + family members
             </p>
           </CardContent>
         </Card>
@@ -231,6 +296,56 @@ export default function BarangayAnalytics() {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Population Breakdown Bar Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Population Breakdown</CardTitle>
+            <CardDescription>
+              Total residents and family members in this barangay
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[
+                    { label: 'Residents (Heads)', value: analytics.overview.totalResidents },
+                    { label: 'Family Members', value: analytics.overview.totalFamilyMembers },
+                    { label: 'Total Population', value: analytics.overview.totalPopulation }
+                  ]}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar
+                    dataKey="value"
+                    fill="#8884d8"
+                    name="Count"
+                    onClick={(data) => {
+                      const label = (data && (data as any).payload?.label) || ''
+                      if (label === 'Residents (Heads)') {
+                        setPopulationDialogTitle('Residents (Heads)')
+                        setPopulationView('residents')
+                        setPopulationDialogOpen(true)
+                      } else if (label === 'Family Members') {
+                        setPopulationDialogTitle('Family Members')
+                        setPopulationView('members')
+                        setPopulationDialogOpen(true)
+                      } else if (label === 'Total Population') {
+                        setPopulationDialogTitle('Total Population')
+                        setPopulationView('residents')
+                        setPopulationDialogOpen(true)
+                      }
+                    }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Monthly Trends Chart */}
         <Card>
           <CardHeader>
@@ -519,6 +634,146 @@ export default function BarangayAnalytics() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Population Details Dialog */}
+      <Dialog open={populationDialogOpen} onOpenChange={setPopulationDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{populationDialogTitle}</DialogTitle>
+            <DialogDescription>
+              Clicked bar breakdown showing individual names and family information.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Group by</span>
+              <select
+                className="border rounded px-2 py-1 text-sm"
+                value={populationView}
+                onChange={(e) =>
+                  setPopulationView(e.target.value === 'members' ? 'members' : 'residents')
+                }
+              >
+                <option value="residents">Residents (Heads)</option>
+                <option value="members">Family Members</option>
+              </select>
+            </div>
+
+            {populationView === 'residents' ? (
+              analytics.populationDetails.residents.length === 0 ? (
+                <p className="text-sm text-gray-500">No residents found.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-3">Name</th>
+                        <th className="text-left py-2 px-3">Contact</th>
+                        <th className="text-left py-2 px-3">Families</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getPaginatedData(
+                        analytics.populationDetails.residents,
+                        populationResidentsPage,
+                        10
+                      ).map((r) => (
+                        <tr key={r.id} className="border-b">
+                          <td className="py-2 px-3 whitespace-nowrap">{r.name}</td>
+                          <td className="py-2 px-3 whitespace-nowrap">
+                            <div className="space-y-1">
+                              <div>Email: {r.email}</div>
+                              <div>Phone: {r.phone}</div>
+                            </div>
+                          </td>
+                          <td className="py-2 px-3">
+                            {r.families.length === 0 ? (
+                              <span className="text-xs text-gray-500">No family record</span>
+                            ) : (
+                              <ul className="list-disc list-inside space-y-1">
+                                {r.families.map((f) => (
+                                  <li key={f.id}>
+                                    {f.address} ({f.membersCount} members)
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            ) : analytics.populationDetails.familyMembers.length === 0 ? (
+              <p className="text-sm text-gray-500">No family members found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-3">Name</th>
+                      <th className="text-left py-2 px-3">Relation</th>
+                      <th className="text-left py-2 px-3">Family Head / Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getPaginatedData(
+                      analytics.populationDetails.familyMembers,
+                      populationMembersPage,
+                      10
+                    ).map((m) => (
+                      <tr key={m.id} className="border-b">
+                        <td className="py-2 px-3 whitespace-nowrap">{m.name}</td>
+                        <td className="py-2 px-3 whitespace-nowrap">{m.relation}</td>
+                        <td className="py-2 px-3">
+                          <div className="space-y-1">
+                            <div>Head: {m.headName}</div>
+                            <div>Address: {m.familyAddress}</div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {populationView === 'residents' ? (
+              analytics.populationDetails.residents.length > 10 && (
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={populationResidentsPage}
+                    totalPages={getTotalPages(
+                      analytics.populationDetails.residents.length,
+                      10
+                    )}
+                    onPageChange={setPopulationResidentsPage}
+                    totalItems={analytics.populationDetails.residents.length}
+                    itemsPerPage={10}
+                  />
+                </div>
+              )
+            ) : (
+              analytics.populationDetails.familyMembers.length > 10 && (
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={populationMembersPage}
+                    totalPages={getTotalPages(
+                      analytics.populationDetails.familyMembers.length,
+                      10
+                    )}
+                    onPageChange={setPopulationMembersPage}
+                    totalItems={analytics.populationDetails.familyMembers.length}
+                    itemsPerPage={10}
+                  />
+                </div>
+              )
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

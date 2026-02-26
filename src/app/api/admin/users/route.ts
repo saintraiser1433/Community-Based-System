@@ -17,8 +17,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const pageRaw = searchParams.get('page') || '1'
+    const limitRaw = searchParams.get('limit') || '10'
+    const pageParsed = parseInt(pageRaw, 10)
+    const limitParsed = parseInt(limitRaw, 10)
+    const page = Number.isNaN(pageParsed) || pageParsed < 1 ? 1 : pageParsed
+    const limit = Number.isNaN(limitParsed) || limitParsed < 1 ? 10 : limitParsed
     const role = searchParams.get('role')
     const search = searchParams.get('search')
 
@@ -27,10 +31,11 @@ export async function GET(request: NextRequest) {
       where.role = role
     }
     if (search) {
+      // Use simple "contains" filters compatible with current Prisma client
       where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } }
+        { firstName: { contains: search } },
+        { lastName: { contains: search } },
+        { email: { contains: search } }
       ]
     }
 

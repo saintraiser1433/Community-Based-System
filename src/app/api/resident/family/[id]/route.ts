@@ -19,10 +19,37 @@ export async function PUT(
     }
 
     const { id } = await params
-    const { name, relation, age } = await request.json()
+    const body = await request.json()
+    const {
+      name,
+      relation,
+      age,
+      isIndigent,
+      indigencyCertPath,
+      isSeniorCitizen,
+      seniorCardPath,
+      isPWD,
+      pwdProofPath,
+      isStudent,
+      studentIdPath,
+      educationLevel
+    } = body
 
     if (!name || !relation) {
       return NextResponse.json({ error: 'Name and relation are required' }, { status: 400 })
+    }
+
+    const educationLevelValue =
+      educationLevel && ['ELEMENTARY', 'HIGH_SCHOOL', 'COLLEGE'].includes(educationLevel)
+        ? educationLevel
+        : null
+
+    const ageNum = age ? parseInt(age, 10) : null
+    if (isSeniorCitizen && (ageNum === null || ageNum < 60)) {
+      return NextResponse.json(
+        { error: 'Senior Citizen can only be set when age is 60 or above.' },
+        { status: 400 }
+      )
     }
 
     // Get user's family
@@ -48,15 +75,37 @@ export async function PUT(
       return NextResponse.json({ error: 'Family member not found' }, { status: 404 })
     }
 
-    // Update family member
-    const updatedMember = await prisma.familyMember.update({
-      where: { id },
-      data: {
-        name,
-        relation: relation.toUpperCase() as any, // Convert to enum value
-        age: age ? parseInt(age) : null
+    // Update family member. Try with student fields first; if Prisma client is old, retry without them.
+    const baseData = {
+      name,
+      relation: relation.toUpperCase() as any,
+      age: ageNum,
+      isIndigent: false,
+      indigencyCertPath: indigencyCertPath || null,
+      indigentVerificationStatus: isIndigent ? 'PENDING' : null,
+      isSeniorCitizen: false,
+      seniorCardPath: seniorCardPath || null,
+      seniorVerificationStatus: isSeniorCitizen ? 'PENDING' : null,
+      isPWD: false,
+      pwdProofPath: pwdProofPath || null,
+      pwdVerificationStatus: isPWD ? 'PENDING' : null
+    }
+    let updatedMember
+    try {
+      updatedMember = await prisma.familyMember.update({
+        where: { id },
+        data: { ...baseData, isStudent: !!isStudent, studentIdPath: studentIdPath || null, educationLevel: educationLevelValue } as any
+      })
+    } catch (err: any) {
+      if (err?.message?.includes('Unknown argument') && err?.message?.includes('isStudent')) {
+        updatedMember = await prisma.familyMember.update({
+          where: { id },
+          data: baseData as any
+        })
+      } else {
+        throw err
       }
-    })
+    }
 
     // Create audit log
     await prisma.auditLog.create({

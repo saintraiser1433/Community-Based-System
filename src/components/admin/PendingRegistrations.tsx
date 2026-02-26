@@ -300,113 +300,114 @@ export default function PendingRegistrations() {
               <p className="text-gray-600">All resident registrations have been processed.</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Resident</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Barangay</TableHead>
-                  <TableHead>Registration Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {getPaginatedData(registrations, currentPage, itemsPerPage).map((registration) => (
-                  <TableRow key={registration.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <User className="h-5 w-5 text-blue-500" />
-                        </div>
-                        <div>
-                          <div className="font-medium">
-                            {registration.firstName} {registration.lastName}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2 text-sm">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          <span>{registration.email}</span>
-                        </div>
-                        {registration.phone && (
-                          <div className="flex items-center space-x-2 text-sm">
-                            <Phone className="h-4 w-4 text-gray-400" />
-                            <span>{registration.phone}</span>
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {registration.barangay ? (
-                        <div>
-                          <div className="font-medium">{registration.barangay.name}</div>
-                          <div className="text-sm text-gray-500">{registration.barangay.code}</div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">No Barangay</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2 text-sm">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <span>{new Date(registration.createdAt).toLocaleDateString()}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-                        Pending Approval
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => openDetailsModal(registration)}
-                          className="text-blue-600 hover:text-blue-700 border-blue-600 hover:border-blue-700"
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          onClick={() => openApproveConfirm(registration)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => openRejectConfirm(registration)}
-                          className="text-red-600 hover:text-red-700 border-red-600 hover:border-red-700"
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Resident</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Barangay</TableHead>
+                    <TableHead>Registration Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-          
-          {registrations.length > itemsPerPage && (
-            <div className="mt-6">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={getTotalPages(registrations, itemsPerPage)}
-                onPageChange={setCurrentPage}
-                totalItems={registrations.length}
-                itemsPerPage={itemsPerPage}
-              />
-            </div>
+                </TableHeader>
+                <TableBody>
+                  {getPaginatedData(registrations, currentPage, itemsPerPage).map((registration) => (
+                    <TableRow key={registration.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <User className="h-5 w-5 text-blue-500" />
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {registration.firstName} {registration.lastName}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2 text-sm">
+                            <Mail className="h-4 w-4 text-gray-400" />
+                            <span>{registration.email}</span>
+                          </div>
+                          {registration.phone && (
+                            <div className="flex items-center space-x-2 text-sm">
+                              <Phone className="h-4 w-4 text-gray-400" />
+                              <span>{registration.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {registration.barangay ? (
+                          <div>
+                            <div className="font-medium">{registration.barangay.name}</div>
+                            <div className="text-sm text-gray-500">{registration.barangay.code}</div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">No Barangay</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2 text-sm">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <span>{new Date(registration.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                          Pending Approval
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openDetailsModal(registration)}
+                            className="text-blue-600 hover:text-blue-700 border-blue-600 hover:border-blue-700"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Details
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            onClick={() => openApproveConfirm(registration)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => openRejectConfirm(registration)}
+                            className="text-red-600 hover:text-red-700 border-red-600 hover:border-red-700"
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Always show pagination bar (even for a single page) */}
+              <div className="mt-6">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={getTotalPages(registrations, itemsPerPage)}
+                  onPageChange={setCurrentPage}
+                  totalItems={registrations.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

@@ -70,6 +70,10 @@ export default function BarangayDashboard() {
   const [selectedFamilyMember, setSelectedFamilyMember] = useState<string | null>(null)
   const [unclaimedResidentsPage, setUnclaimedResidentsPage] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [verifyConfirmOpen, setVerifyConfirmOpen] = useState(false)
+  const [verifyConfirmMember, setVerifyConfirmMember] = useState<{ id: string; name: string } | null>(null)
+  const [verifyConfirmField, setVerifyConfirmField] = useState<'indigent' | 'senior' | 'pwd' | null>(null)
+  const [verifyConfirmLoading, setVerifyConfirmLoading] = useState(false)
   
   // Pagination states
   const [schedulesPage, setSchedulesPage] = useState(1)
@@ -417,6 +421,47 @@ export default function BarangayDashboard() {
   const openFamilyMemberSelect = (resident: any) => {
     setSelectedResidentForClaim(resident)
     setShowFamilyMemberSelect(true)
+  }
+
+  const openVerifyConfirm = (member: any, field: 'indigent' | 'senior' | 'pwd') => {
+    setVerifyConfirmMember({ id: member.id, name: member.name })
+    setVerifyConfirmField(field)
+    setVerifyConfirmOpen(true)
+  }
+
+  const handleVerifyConfirm = async () => {
+    if (!verifyConfirmMember || !verifyConfirmField || !selectedResident) return
+    setVerifyConfirmLoading(true)
+    try {
+      const response = await fetch('/api/barangay/family-members/' + verifyConfirmMember.id + '/verify', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: verifyConfirmField, action: 'APPROVE' })
+      })
+      const data = response.ok ? await response.json().catch(() => ({})) : await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to update verification')
+        return
+      }
+      const fieldLabel = verifyConfirmField === 'indigent' ? 'Indigent' : verifyConfirmField === 'senior' ? 'Senior Citizen' : 'PWD'
+      toast.success(`${fieldLabel} status approved`)
+      const residentsRes = await fetch('/api/barangay/residents')
+      if (residentsRes.ok) {
+        const list = await residentsRes.json()
+        setResidents(list)
+        setClassifiedResidents(list)
+        const updated = list.find((r: any) => r.id === selectedResident.id)
+        if (updated) setSelectedResident(updated)
+      }
+      setVerifyConfirmOpen(false)
+      setVerifyConfirmMember(null)
+      setVerifyConfirmField(null)
+    } catch (e) {
+      console.error(e)
+      toast.error('An error occurred while approving')
+    } finally {
+      setVerifyConfirmLoading(false)
+    }
   }
 
   const handleClaimForResident = async (resident: any, familyMemberId?: string, familyMemberName?: string) => {
@@ -1690,9 +1735,9 @@ export default function BarangayDashboard() {
 
       {/* Resident Details Dialog */}
       <Dialog open={showResidentDetails} onOpenChange={setShowResidentDetails}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto sm:w-full">
+        <DialogContent className="w-[98vw] max-w-4xl max-h-[90vh] overflow-y-auto sm:w-full">
           <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Resident Details</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl md:text-2xl">Resident Details</DialogTitle>
             <DialogDescription className="text-sm sm:text-base">
               View detailed information about this resident
             </DialogDescription>
@@ -1724,13 +1769,15 @@ export default function BarangayDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Status</Label>
-                  <Badge variant={selectedResident.isActive ? 'default' : 'secondary'}>
-                    {selectedResident.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <div className="mt-1">
+                    <Badge variant={selectedResident.isActive ? 'default' : 'secondary'}>
+                      {selectedResident.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Registration Date</Label>
-                  <p className="text-sm">
+                  <p className="text-sm mt-1">
                     {new Date(selectedResident.createdAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -1739,16 +1786,23 @@ export default function BarangayDashboard() {
               {selectedResident.families && selectedResident.families.length > 0 ? (
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Family Information</Label>
-                  <div className="mt-2 space-y-4">
+                  <div className="mt-3 space-y-5">
                     {selectedResident.families.map((family: any) => (
                       <div key={family.id} className="p-4 border rounded-lg bg-gray-50">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-sm font-medium text-gray-700">
-                            {family.isHead ? 'Family Head' : 'Family Member'}
-                          </p>
-                          <Badge variant="outline" className="text-xs">
-                            {family.members ? family.members.length + 1 : 1} members
-                          </Badge>
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3 gap-2">
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">
+                              {family.isHead ? 'Family Head Household' : 'Family Household'}
+                            </p>
+                            {family.address && (
+                              <p className="text-xs text-gray-500">{family.address}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {family.members ? family.members.length + 1 : 1} members
+                            </Badge>
+                          </div>
                         </div>
                         
                         {/* Family Head (the resident themselves) */}
@@ -1766,21 +1820,90 @@ export default function BarangayDashboard() {
 
                         {/* Family Members */}
                         {family.members && family.members.length > 0 && (
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Family Members</p>
                             {family.members.map((member: any) => (
-                              <div key={member.id} className="p-2 bg-white rounded border">
-                                <div className="flex items-center justify-between">
+                              <div
+                                key={member.id}
+                                className="p-3 bg-white rounded border space-y-2"
+                              >
+                                {/* Top row: name + relation badge */}
+                                <div className="flex items-start justify-between gap-2">
                                   <div>
                                     <p className="text-sm font-medium text-gray-900">{member.name}</p>
-                                    <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
                                       <span className="capitalize">{member.relation.toLowerCase()}</span>
                                       {member.age && <span>• Age: {member.age}</span>}
                                     </div>
                                   </div>
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="secondary" className="text-xs h-5">
                                     {member.relation}
                                   </Badge>
+                                </div>
+
+                                {/* Status chips row */}
+                                <div className="flex flex-wrap gap-1">
+                                  {member.indigentVerificationStatus === 'PENDING' && (
+                                    <Badge variant="outline" className="border-purple-300 text-purple-700">
+                                      Indigent - Pending
+                                    </Badge>
+                                  )}
+                                  {member.isIndigent && member.indigentVerificationStatus === 'APPROVED' && (
+                                    <Badge variant="outline" className="border-purple-300 text-purple-700">
+                                      Indigent
+                                    </Badge>
+                                  )}
+                                  {member.seniorVerificationStatus === 'PENDING' && (
+                                    <Badge variant="outline" className="border-orange-300 text-orange-700">
+                                      Senior - Pending
+                                    </Badge>
+                                  )}
+                                  {member.isSeniorCitizen && member.seniorVerificationStatus === 'APPROVED' && (
+                                    <Badge variant="outline" className="border-orange-300 text-orange-700">
+                                      Senior
+                                    </Badge>
+                                  )}
+                                  {member.pwdVerificationStatus === 'PENDING' && (
+                                    <Badge variant="outline" className="border-blue-300 text-blue-700">
+                                      PWD - Pending
+                                    </Badge>
+                                  )}
+                                  {member.isPWD && member.pwdVerificationStatus === 'APPROVED' && (
+                                    <Badge variant="outline" className="border-blue-300 text-blue-700">
+                                      PWD
+                                    </Badge>
+                                  )}
+                                </div>
+
+                                {/* Approve buttons row */}
+                                <div className="flex flex-wrap gap-2 pt-1">
+                                      {member.indigentVerificationStatus === 'PENDING' && (
+                                        <Button
+                                          size="xs"
+                                          variant="outline"
+                                          onClick={() => openVerifyConfirm(member, 'indigent')}
+                                        >
+                                          Approve Indigent
+                                        </Button>
+                                      )}
+                                      {member.seniorVerificationStatus === 'PENDING' && (
+                                        <Button
+                                          size="xs"
+                                          variant="outline"
+                                          onClick={() => openVerifyConfirm(member, 'senior')}
+                                        >
+                                          Approve Senior
+                                        </Button>
+                                      )}
+                                      {member.pwdVerificationStatus === 'PENDING' && (
+                                        <Button
+                                          size="xs"
+                                          variant="outline"
+                                          onClick={() => openVerifyConfirm(member, 'pwd')}
+                                        >
+                                          Approve PWD
+                                        </Button>
+                                      )}
                                 </div>
                               </div>
                             ))}
@@ -1843,6 +1966,25 @@ export default function BarangayDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Verify status confirmation */}
+      <ConfirmationDialog
+        open={verifyConfirmOpen}
+        onOpenChange={(open) => {
+          if (!verifyConfirmLoading) {
+            setVerifyConfirmOpen(open)
+            if (!open) {
+              setVerifyConfirmMember(null)
+              setVerifyConfirmField(null)
+            }
+          }
+        }}
+        onConfirm={handleVerifyConfirm}
+        title={verifyConfirmField === 'indigent' ? 'Approve Indigent Status?' : verifyConfirmField === 'senior' ? 'Approve Senior Citizen Status?' : 'Approve PWD Status?'}
+        description={verifyConfirmMember ? `Confirm approval of ${verifyConfirmField === 'indigent' ? 'Indigent' : verifyConfirmField === 'senior' ? 'Senior Citizen' : 'PWD'} status for ${verifyConfirmMember.name}.` : ''}
+        action="update"
+        loading={verifyConfirmLoading}
+      />
 
       {/* Unclaimed Residents Modal */}
       <Dialog open={showUnclaimedResidents} onOpenChange={setShowUnclaimedResidents}>

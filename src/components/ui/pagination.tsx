@@ -18,10 +18,14 @@ export default function Pagination({
   totalItems,
   itemsPerPage
 }: PaginationProps) {
-  const startItem = (currentPage - 1) * itemsPerPage + 1
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems)
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
+  const endItem = totalItems === 0 ? 0 : Math.min(currentPage * itemsPerPage, totalItems)
 
   const getVisiblePages = () => {
+    if (totalPages <= 1) {
+      return [1]
+    }
+
     const delta = 2
     const range = []
     const rangeWithDots = []
@@ -45,19 +49,6 @@ export default function Pagination({
     }
 
     return rangeWithDots
-  }
-
-  if (totalPages <= 1) {
-    return (
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-700">
-          Showing {startItem} to {endItem} of {totalItems} results
-        </div>
-        <div className="text-sm text-gray-500">
-          Page 1 of 1
-        </div>
-      </div>
-    )
   }
 
   return (

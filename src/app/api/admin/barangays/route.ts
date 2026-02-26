@@ -15,28 +15,85 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const barangays = await prisma.barangay.findMany({
-      include: {
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
+    const { searchParams } = new URL(request.url)
+    const search = searchParams.get('search') || ''
+    const pageParam = searchParams.get('page')
+    const limitParam = searchParams.get('limit')
+
+    const where: any = {}
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } }
+      ]
+    }
+
+    // If page/limit are not provided, return full list (for dropdowns, reports, etc.)
+    if (!pageParam || !limitParam) {
+      const barangays = await prisma.barangay.findMany({
+        where,
+        include: {
+          manager: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          _count: {
+            select: {
+              residents: true,
+              schedules: true,
+              claims: true
+            }
           }
         },
-        _count: {
-          select: {
-            residents: true,
-            schedules: true,
-            claims: true
-          }
-        }
-      },
-      orderBy: { name: 'asc' }
-    })
+        orderBy: { name: 'asc' }
+      })
 
-    return NextResponse.json(barangays)
+      return NextResponse.json(barangays)
+    }
+
+    const page = parseInt(pageParam || '1', 10) || 1
+    const limit = parseInt(limitParam || '10', 10) || 10
+
+    const [barangays, total] = await Promise.all([
+      prisma.barangay.findMany({
+        where,
+        include: {
+          manager: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          _count: {
+            select: {
+              residents: true,
+              schedules: true,
+              claims: true
+            }
+          }
+        },
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      prisma.barangay.count({ where })
+    ])
+
+    return NextResponse.json({
+      barangays,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    })
   } catch (error) {
     console.error('Error fetching barangays:', error)
     return NextResponse.json(

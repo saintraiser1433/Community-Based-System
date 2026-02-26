@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
     // Get overview statistics
     const [
       totalResidents,
+      totalFamilyMembers,
       totalSchedules,
       totalClaims,
       upcomingSchedules
@@ -45,6 +46,13 @@ export async function GET(request: NextRequest) {
           barangayId: user.barangayId,
           role: 'RESIDENT',
           isActive: true
+        }
+      }),
+      prisma.familyMember.count({
+        where: {
+          family: {
+            barangayId: user.barangayId
+          }
         }
       }),
       prisma.donationSchedule.count({
@@ -257,9 +265,53 @@ export async function GET(request: NextRequest) {
 
     console.log('Unclaimed residents data:', unclaimedResidentsData.length)
 
+    // Detailed population breakdown for clickable charts
+    const residentsWithFamilies = await prisma.user.findMany({
+      where: {
+        barangayId: user.barangayId,
+        role: 'RESIDENT',
+        isActive: true
+      },
+      include: {
+        families: {
+          include: {
+            members: true
+          }
+        }
+      }
+    })
+
+    const populationDetails = {
+      residents: residentsWithFamilies.map((resident) => ({
+        id: resident.id,
+        name: `${resident.firstName} ${resident.lastName}`,
+        email: resident.email,
+        phone: resident.phone || 'N/A',
+        families: resident.families.map((family) => ({
+          id: family.id,
+          address: family.address,
+          membersCount: family.members.length
+        }))
+      })),
+      familyMembers: residentsWithFamilies.flatMap((resident) =>
+        resident.families.flatMap((family) =>
+          family.members.map((member) => ({
+            id: member.id,
+            name: member.name,
+            relation: member.relation,
+            familyId: family.id,
+            familyAddress: family.address,
+            headName: `${resident.firstName} ${resident.lastName}`
+          }))
+        )
+      )
+    }
+
     const analytics = {
       overview: {
         totalResidents,
+        totalFamilyMembers,
+        totalPopulation: totalResidents + totalFamilyMembers,
         totalSchedules,
         totalClaims,
         upcomingSchedules,
@@ -282,7 +334,8 @@ export async function GET(request: NextRequest) {
         residentEngagement,
         claimEfficiency
       },
-      unclaimedResidents: unclaimedResidentsData
+      unclaimedResidents: unclaimedResidentsData,
+      populationDetails
     }
 
     console.log('Analytics data being returned:', JSON.stringify(analytics, null, 2))

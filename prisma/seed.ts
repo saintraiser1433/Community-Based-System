@@ -79,8 +79,9 @@ async function main() {
 
   console.log(`✅ Created ${barangays.length} barangays`)
 
-  // Create admin user
-  const hashedPassword = await bcrypt.hash('admin123', 12)
+  // Use a single common password for all test accounts
+  const plainPassword = 'password123'
+  const hashedPassword = await bcrypt.hash(plainPassword, 12)
   const admin = await prisma.user.create({
     data: {
       email: 'admin@cbds.com',
@@ -98,7 +99,7 @@ async function main() {
   // Create barangay managers for each barangay
   const barangayManagers = []
   for (let i = 0; i < barangays.length; i++) {
-    const managerPassword = await bcrypt.hash('manager123', 12)
+    const managerPassword = hashedPassword
     const manager = await prisma.user.create({
       data: {
         email: `manager${i + 1}@cbds.com`,
@@ -133,7 +134,7 @@ async function main() {
     const residentsPerBarangay = Math.floor(Math.random() * 8) + 8
     
     for (let i = 0; i < residentsPerBarangay; i++) {
-      const residentPassword = await bcrypt.hash('resident123', 12)
+      const residentPassword = hashedPassword
       const resident = await prisma.user.create({
         data: {
           email: `resident${residentCounter}@cbds.com`,
@@ -414,13 +415,13 @@ async function main() {
   console.log(`- ${claims.length} Claims`)
   console.log(`- ${auditLogs.length} Audit Logs`)
   
-  console.log('\n📋 Test Accounts:')
-  console.log('Admin: admin@cbds.com / admin123')
+  console.log('\n📋 Test Accounts (all use password: password123):')
+  console.log('Admin: admin@cbds.com')
   for (let i = 0; i < Math.min(3, barangayManagers.length); i++) {
-    console.log(`Barangay Manager ${i + 1}: manager${i + 1}@cbds.com / manager123`)
+    console.log(`Barangay Manager ${i + 1}: manager${i + 1}@cbds.com`)
   }
   for (let i = 0; i < Math.min(5, residents.length); i++) {
-    console.log(`Resident ${i + 1}: resident${i + 1}@cbds.com / resident123`)
+    console.log(`Resident ${i + 1}: resident${i + 1}@cbds.com`)
   }
   
   console.log('\n📈 Analytics Data:')

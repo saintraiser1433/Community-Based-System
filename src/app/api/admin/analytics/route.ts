@@ -120,8 +120,21 @@ export async function GET(request: NextRequest) {
     // Get counts for each barangay separately
     const barangayStatsWithRates = await Promise.all(
       barangays.map(async (barangay) => {
-        const [residentsCount, schedulesCount, claimsCount, claimedSchedulesCount] = await Promise.all([
+        const [
+          residentsCount,
+          familyMembersCount,
+          schedulesCount,
+          claimsCount,
+          claimedSchedulesCount
+        ] = await Promise.all([
           prisma.user.count({ where: { barangayId: barangay.id, role: 'RESIDENT' } }),
+          prisma.familyMember.count({
+            where: {
+              family: {
+                barangayId: barangay.id
+              }
+            }
+          }),
           prisma.donationSchedule.count({ where: { barangayId: barangay.id } }),
           prisma.claim.count({ where: { barangayId: barangay.id } }),
           // Count unique schedules that have at least one claim
@@ -141,8 +154,10 @@ export async function GET(request: NextRequest) {
           : 0
         
         return {
+          id: barangay.id,
           name: barangay.name,
           residents: residentsCount,
+          familyMembers: familyMembersCount,
           schedules: schedulesCount,
           claims: claimsCount,
           claimRate

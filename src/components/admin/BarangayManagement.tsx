@@ -332,7 +332,7 @@ export default function BarangayManagement() {
                 />
               </div>
             </div>
-            <Button onClick={fetchBarangays}>Search</Button>
+            <Button onClick={() => fetchBarangays(1)}>Search</Button>
           </div>
 
           {/* Barangays Table */}

@@ -395,7 +395,11 @@ export default function UserManagement() {
                 />
               </div>
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select value={roleFilter} onValueChange={(value) => {
+              setRoleFilter(value)
+              setCurrentPage(1)
+              fetchUsers(1)
+            }}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
@@ -405,7 +409,7 @@ export default function UserManagement() {
                 <SelectItem value="BARANGAY">Barangay Manager</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={fetchUsers}>Search</Button>
+            <Button onClick={() => fetchUsers(1)}>Search</Button>
           </div>
 
           {/* Users Table */}

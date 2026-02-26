@@ -31,6 +31,7 @@ import {
   Trash2
 } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 // Helper function to convert 24-hour time to 12-hour format
 const formatTime12Hour = (time24: string): string => {
@@ -58,8 +59,21 @@ export default function ResidentDashboard() {
   const [newMember, setNewMember] = useState({
     name: '',
     relation: '',
-    age: ''
+    age: '',
+    isIndigent: false,
+    isSeniorCitizen: false,
+    isPWD: false,
+    isStudent: false,
+    indigencyCertPath: '',
+    seniorCardPath: '',
+    pwdProofPath: '',
+    studentIdPath: '',
+    educationLevel: ''
   })
+  const [indigencyFile, setIndigencyFile] = useState<File | null>(null)
+  const [seniorCardFile, setSeniorCardFile] = useState<File | null>(null)
+  const [pwdProofFile, setPwdProofFile] = useState<File | null>(null)
+  const [studentIdFile, setStudentIdFile] = useState<File | null>(null)
   
   // Pagination states
   const [schedulesPage, setSchedulesPage] = useState(1)
@@ -121,19 +135,96 @@ export default function ResidentDashboard() {
     setNewMember({
       name: '',
       relation: '',
-      age: ''
+      age: '',
+      isIndigent: false,
+      isSeniorCitizen: false,
+      isPWD: false,
+      isStudent: false,
+      indigencyCertPath: '',
+      seniorCardPath: '',
+      pwdProofPath: '',
+      studentIdPath: '',
+      educationLevel: ''
     })
+    setIndigencyFile(null)
+    setSeniorCardFile(null)
+    setPwdProofFile(null)
+    setStudentIdFile(null)
     setShowAddMemberModal(true)
   }
 
   const handleAddMember = async () => {
     try {
+      // Client-side validation for required proofs
+      if (newMember.isIndigent && !indigencyFile) {
+        toast.error('Please upload Certificate of Indigency.')
+        return
+      }
+      if (newMember.isSeniorCitizen && !seniorCardFile) {
+        toast.error('Please upload Senior Citizen ID.')
+        return
+      }
+      if (newMember.isPWD && !pwdProofFile) {
+        toast.error('Please upload PWD proof/ID.')
+        return
+      }
+      if (newMember.isStudent) {
+        if (!studentIdFile) {
+          toast.error('Please upload Student ID.')
+          return
+        }
+        if (!newMember.educationLevel) {
+          toast.error('Please select education level (Elementary, High School, or College).')
+          return
+        }
+      }
+      const ageNum = newMember.age ? parseInt(newMember.age, 10) : null
+      if (newMember.isSeniorCitizen && (ageNum === null || ageNum < 60)) {
+        toast.error('Senior Citizen can only be set when age is 60 or above.')
+        return
+      }
+
+      const payload: any = { ...newMember }
+
+      // Upload files if provided
+      const uploadFile = async (file: File, field: string) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('field', field)
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Failed to upload file')
+        }
+        const data = await res.json()
+        return data.filePath as string
+      }
+
+      if (newMember.isIndigent && indigencyFile) {
+        payload.indigencyCertPath = await uploadFile(indigencyFile, 'family_member_indigency_certificate')
+      }
+      if (newMember.isSeniorCitizen && seniorCardFile) {
+        payload.seniorCardPath = await uploadFile(seniorCardFile, 'family_member_senior_card')
+      }
+      if (newMember.isPWD && pwdProofFile) {
+        payload.pwdProofPath = await uploadFile(pwdProofFile, 'family_member_pwd_proof')
+      }
+      if (newMember.isStudent && studentIdFile) {
+        payload.studentIdPath = await uploadFile(studentIdFile, 'family_member_student_id')
+      }
+      if (newMember.educationLevel) {
+        payload.educationLevel = newMember.educationLevel
+      }
+
       const response = await fetch('/api/resident/family', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newMember),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
@@ -161,11 +252,27 @@ export default function ResidentDashboard() {
 
   const openEditMemberModal = (member: any) => {
     setSelectedMember(member)
+    const ageStr = member.age?.toString() ?? ''
+    const ageNum = ageStr ? parseInt(ageStr, 10) : null
+    const canBeSenior = ageNum !== null && ageNum >= 60
     setNewMember({
       name: member.name,
       relation: member.relation.toLowerCase(),
-      age: member.age?.toString() || ''
+      age: ageStr,
+      isIndigent: !!member.isIndigent,
+      isSeniorCitizen: canBeSenior && !!member.isSeniorCitizen,
+      isPWD: !!member.isPWD,
+      isStudent: !!member.isStudent,
+      indigencyCertPath: member.indigencyCertPath || '',
+      seniorCardPath: member.seniorCardPath || '',
+      pwdProofPath: member.pwdProofPath || '',
+      studentIdPath: member.studentIdPath || '',
+      educationLevel: member.educationLevel || ''
     })
+    setIndigencyFile(null)
+    setSeniorCardFile(null)
+    setPwdProofFile(null)
+    setStudentIdFile(null)
     setShowEditMemberModal(true)
   }
 
@@ -179,12 +286,74 @@ export default function ResidentDashboard() {
     if (!selectedMember) return
 
     try {
+      if (newMember.isIndigent && !newMember.indigencyCertPath && !indigencyFile) {
+        toast.error('Please upload Certificate of Indigency.')
+        return
+      }
+      if (newMember.isSeniorCitizen && !newMember.seniorCardPath && !seniorCardFile) {
+        toast.error('Please upload Senior Citizen ID.')
+        return
+      }
+      if (newMember.isPWD && !newMember.pwdProofPath && !pwdProofFile) {
+        toast.error('Please upload PWD proof/ID.')
+        return
+      }
+      if (newMember.isStudent) {
+        if (!newMember.studentIdPath && !studentIdFile) {
+          toast.error('Please upload Student ID.')
+          return
+        }
+        if (!newMember.educationLevel) {
+          toast.error('Please select education level (Elementary, High School, or College).')
+          return
+        }
+      }
+      const ageNum = newMember.age ? parseInt(newMember.age, 10) : null
+      if (newMember.isSeniorCitizen && (ageNum === null || ageNum < 60)) {
+        toast.error('Senior Citizen can only be set when age is 60 or above.')
+        return
+      }
+
+      const payload: any = { ...newMember }
+
+      const uploadFile = async (file: File, field: string) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('field', field)
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || 'Failed to upload file')
+        }
+        const data = await res.json()
+        return data.filePath as string
+      }
+
+      if (newMember.isIndigent && indigencyFile) {
+        payload.indigencyCertPath = await uploadFile(indigencyFile, 'family_member_indigency_certificate')
+      }
+      if (newMember.isSeniorCitizen && seniorCardFile) {
+        payload.seniorCardPath = await uploadFile(seniorCardFile, 'family_member_senior_card')
+      }
+      if (newMember.isPWD && pwdProofFile) {
+        payload.pwdProofPath = await uploadFile(pwdProofFile, 'family_member_pwd_proof')
+      }
+      if (newMember.isStudent && studentIdFile) {
+        payload.studentIdPath = await uploadFile(studentIdFile, 'family_member_student_id')
+      }
+      if (newMember.educationLevel) {
+        payload.educationLevel = newMember.educationLevel
+      }
+
       const response = await fetch(`/api/resident/family/${selectedMember.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newMember),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
@@ -530,6 +699,98 @@ export default function ResidentDashboard() {
                             <p className="text-sm text-gray-600">
                               {member.relation} • Age: {member.age || 'N/A'}
                             </p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {member.indigentVerificationStatus === 'PENDING' && (
+                                <Badge variant="outline" className="border-purple-300 text-purple-700">
+                                  Indigent - Pending Approval
+                                </Badge>
+                              )}
+                              {member.isIndigent && member.indigentVerificationStatus === 'APPROVED' && (
+                                <Badge variant="outline" className="border-purple-300 text-purple-700">
+                                  Indigent
+                                </Badge>
+                              )}
+                              {member.seniorVerificationStatus === 'PENDING' && (
+                                <Badge variant="outline" className="border-orange-300 text-orange-700">
+                                  Senior Citizen - Pending Approval
+                                </Badge>
+                              )}
+                              {member.isSeniorCitizen && member.seniorVerificationStatus === 'APPROVED' && (
+                                <Badge variant="outline" className="border-orange-300 text-orange-700">
+                                  Senior Citizen
+                                </Badge>
+                              )}
+                              {member.pwdVerificationStatus === 'PENDING' && (
+                                <Badge variant="outline" className="border-blue-300 text-blue-700">
+                                  PWD - Pending Approval
+                                </Badge>
+                              )}
+                              {member.isPWD && member.pwdVerificationStatus === 'APPROVED' && (
+                                <Badge variant="outline" className="border-blue-300 text-blue-700">
+                                  PWD
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col gap-1 mt-2 text-xs">
+                              {member.indigencyCertPath && (
+                                <div>
+                                  <Link
+                                    href={member.indigencyCertPath}
+                                    target="_blank"
+                                    className="text-purple-700 underline"
+                                  >
+                                    View Indigency Certificate
+                                  </Link>
+                                  <span className="ml-2 text-gray-600">
+                                    (
+                                    {member.indigentVerificationStatus === 'APPROVED' && 'Approved'}
+                                    {member.indigentVerificationStatus === 'PENDING' && 'Pending'}
+                                    {member.indigentVerificationStatus === 'REJECTED' && 'Rejected'}
+                                    {!member.indigentVerificationStatus && 'Not submitted for approval'}
+                                    )
+                                  </span>
+                                </div>
+                              )}
+                              {member.seniorCardPath && (
+                                <div>
+                                  <Link
+                                    href={member.seniorCardPath}
+                                    target="_blank"
+                                    className="text-orange-700 underline"
+                                  >
+                                    View Senior ID
+                                  </Link>
+                                  <span className="ml-2 text-gray-600">
+                                    (
+                                    {member.seniorVerificationStatus === 'APPROVED' && 'Approved'}
+                                    {member.seniorVerificationStatus === 'PENDING' && 'Pending'}
+                                    {member.seniorVerificationStatus === 'REJECTED' && 'Rejected'}
+                                    {!member.seniorVerificationStatus && 'Not submitted for approval'}
+                                    )
+                                  </span>
+                                </div>
+                              )}
+                              {member.pwdProofPath && (
+                                <div>
+                                  <Link
+                                    href={member.pwdProofPath}
+                                    target="_blank"
+                                    className="text-blue-700 underline"
+                                  >
+                                    View PWD Proof
+                                  </Link>
+                                  <span className="ml-2 text-gray-600">
+                                    (
+                                    {member.pwdVerificationStatus === 'APPROVED' && 'Approved'}
+                                    {member.pwdVerificationStatus === 'PENDING' && 'Pending'}
+                                    {member.pwdVerificationStatus === 'REJECTED' && 'Rejected'}
+                                    {!member.pwdVerificationStatus && 'Not submitted for approval'}
+                                    )
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="flex space-x-2">
@@ -737,8 +998,176 @@ export default function ResidentDashboard() {
                 type="number"
                 placeholder="Enter age"
                 value={newMember.age}
-                onChange={(e) => setNewMember({ ...newMember, age: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value
+                  const num = val ? parseInt(val, 10) : null
+                  const canBeSenior = num !== null && num >= 60
+                  setNewMember({
+                    ...newMember,
+                    age: val,
+                    ...(newMember.isSeniorCitizen && !canBeSenior ? { isSeniorCitizen: false } : {})
+                  })
+                }}
               />
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  id="isIndigent"
+                  type="checkbox"
+                  checked={newMember.isIndigent}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, isIndigent: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="isIndigent" className="cursor-pointer">
+                  Is Indigent? (requires Certificate of Indigency)
+                </Label>
+              </div>
+              {newMember.isIndigent && (
+                <div>
+                  <Label htmlFor="indigencyCert">Certificate of Indigency *</Label>
+                  <Input
+                    id="indigencyCert"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => setIndigencyFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center space-x-2">
+                <input
+                  id="isSeniorCitizen"
+                  type="checkbox"
+                  checked={newMember.isSeniorCitizen}
+                  disabled={
+                    newMember.age === '' ||
+                    isNaN(parseInt(newMember.age, 10)) ||
+                    parseInt(newMember.age, 10) < 60
+                  }
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, isSeniorCitizen: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                <Label
+                  htmlFor="isSeniorCitizen"
+                  className={
+                    newMember.age === '' || parseInt(newMember.age, 10) < 60
+                      ? 'cursor-not-allowed text-muted-foreground'
+                      : 'cursor-pointer'
+                  }
+                >
+                  Is Senior Citizen? (requires Senior Citizen ID, age 60+)
+                </Label>
+              </div>
+              {newMember.isSeniorCitizen && (
+                <div>
+                  <Label htmlFor="seniorCard">Senior Citizen ID *</Label>
+                  <Input
+                    id="seniorCard"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => setSeniorCardFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2 rounded-lg border p-3">
+                <Label className="text-sm font-medium">Study status</Label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="studentStatus"
+                      checked={newMember.isStudent}
+                      onChange={() =>
+                        setNewMember({ ...newMember, isStudent: true })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <span>Student</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="studentStatus"
+                      checked={!newMember.isStudent}
+                      onChange={() => {
+                        setNewMember({
+                          ...newMember,
+                          isStudent: false,
+                          educationLevel: '',
+                          studentIdPath: ''
+                        })
+                        setStudentIdFile(null)
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span>Not student</span>
+                  </label>
+                </div>
+                {newMember.isStudent && (
+                  <>
+                    <div className="mt-3">
+                      <Label htmlFor="studentId">Student ID *</Label>
+                      <Input
+                        id="studentId"
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        onChange={(e) => setStudentIdFile(e.target.files?.[0] || null)}
+                      />
+                    </div>
+                    <div className="mt-2">
+                      <Label htmlFor="educationLevel">Education level *</Label>
+                      <Select
+                        value={newMember.educationLevel}
+                        onValueChange={(value) =>
+                          setNewMember({ ...newMember, educationLevel: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ELEMENTARY">Elementary</SelectItem>
+                          <SelectItem value="HIGH_SCHOOL">High School</SelectItem>
+                          <SelectItem value="COLLEGE">College</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  id="isPWD"
+                  type="checkbox"
+                  checked={newMember.isPWD}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, isPWD: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="isPWD" className="cursor-pointer">
+                  Is PWD? (requires PWD proof/ID)
+                </Label>
+              </div>
+              {newMember.isPWD && (
+                <div>
+                  <Label htmlFor="pwdProof">PWD Proof/ID *</Label>
+                  <Input
+                    id="pwdProof"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => setPwdProofFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
             </div>
             
             <div className="flex justify-end space-x-2 pt-4">
@@ -894,8 +1323,184 @@ export default function ResidentDashboard() {
                 type="number"
                 placeholder="Enter age"
                 value={newMember.age}
-                onChange={(e) => setNewMember({ ...newMember, age: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value
+                  const num = val ? parseInt(val, 10) : null
+                  const canBeSenior = num !== null && num >= 60
+                  setNewMember({
+                    ...newMember,
+                    age: val,
+                    ...(newMember.isSeniorCitizen && !canBeSenior ? { isSeniorCitizen: false } : {})
+                  })
+                }}
               />
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  id="edit-isIndigent"
+                  type="checkbox"
+                  checked={newMember.isIndigent}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, isIndigent: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="edit-isIndigent" className="cursor-pointer">
+                  Is Indigent? (requires Certificate of Indigency)
+                </Label>
+              </div>
+              {newMember.isIndigent && (
+                <div>
+                  <Label htmlFor="edit-indigencyCert">
+                    Certificate of Indigency * (upload to change)
+                  </Label>
+                  <Input
+                    id="edit-indigencyCert"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => setIndigencyFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center space-x-2">
+                <input
+                  id="edit-isSeniorCitizen"
+                  type="checkbox"
+                  checked={newMember.isSeniorCitizen}
+                  disabled={
+                    newMember.age === '' ||
+                    isNaN(parseInt(newMember.age, 10)) ||
+                    parseInt(newMember.age, 10) < 60
+                  }
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, isSeniorCitizen: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                <Label
+                  htmlFor="edit-isSeniorCitizen"
+                  className={
+                    newMember.age === '' || parseInt(newMember.age, 10) < 60
+                      ? 'cursor-not-allowed text-muted-foreground'
+                      : 'cursor-pointer'
+                  }
+                >
+                  Is Senior Citizen? (requires Senior Citizen ID, age 60+)
+                </Label>
+              </div>
+              {newMember.isSeniorCitizen && (
+                <div>
+                  <Label htmlFor="edit-seniorCard">
+                    Senior Citizen ID * (upload to change)
+                  </Label>
+                  <Input
+                    id="edit-seniorCard"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => setSeniorCardFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2 rounded-lg border p-3">
+                <Label className="text-sm font-medium">Study status</Label>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="edit-studentStatus"
+                      checked={newMember.isStudent}
+                      onChange={() =>
+                        setNewMember({ ...newMember, isStudent: true })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <span>Student</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="edit-studentStatus"
+                      checked={!newMember.isStudent}
+                      onChange={() => {
+                        setNewMember({
+                          ...newMember,
+                          isStudent: false,
+                          educationLevel: '',
+                          studentIdPath: ''
+                        })
+                        setStudentIdFile(null)
+                      }}
+                      className="h-4 w-4"
+                    />
+                    <span>Not student</span>
+                  </label>
+                </div>
+                {newMember.isStudent && (
+                  <>
+                    <div className="mt-3">
+                      <Label htmlFor="edit-studentId">
+                        Student ID * (upload to change)
+                      </Label>
+                      <Input
+                        id="edit-studentId"
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        onChange={(e) => setStudentIdFile(e.target.files?.[0] || null)}
+                      />
+                    </div>
+                    <div className="mt-2">
+                      <Label htmlFor="edit-educationLevel">Education level *</Label>
+                      <Select
+                        value={newMember.educationLevel}
+                        onValueChange={(value) =>
+                          setNewMember({ ...newMember, educationLevel: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ELEMENTARY">Elementary</SelectItem>
+                          <SelectItem value="HIGH_SCHOOL">High School</SelectItem>
+                          <SelectItem value="COLLEGE">College</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  id="edit-isPWD"
+                  type="checkbox"
+                  checked={newMember.isPWD}
+                  onChange={(e) =>
+                    setNewMember({ ...newMember, isPWD: e.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="edit-isPWD" className="cursor-pointer">
+                  Is PWD? (requires PWD proof/ID)
+                </Label>
+              </div>
+              {newMember.isPWD && (
+                <div>
+                  <Label htmlFor="edit-pwdProof">
+                    PWD Proof/ID * (upload to change)
+                  </Label>
+                  <Input
+                    id="edit-pwdProof"
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    onChange={(e) => setPwdProofFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              )}
             </div>
             
             <div className="flex justify-end space-x-2 pt-4">
