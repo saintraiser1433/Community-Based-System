@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
+import { GlobalSeniorAutoRefresh } from "@/components/GlobalSeniorAutoRefresh";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,6 +31,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full overflow-x-hidden`}
       >
         <AuthSessionProvider>
+          <GlobalSeniorAutoRefresh />
           {children}
           <ToastProvider />
         </AuthSessionProvider>

@@ -4,7 +4,7 @@ import { VerificationStatus } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-type VerificationField = 'indigent' | 'senior' | 'pwd'
+type VerificationField = 'indigent' | 'senior' | 'pwd' | 'student'
 type VerificationAction = 'APPROVE' | 'REJECT'
 
 export async function PUT(
@@ -35,7 +35,7 @@ export async function PUT(
       )
     }
 
-    if (!['indigent', 'senior', 'pwd'].includes(field)) {
+    if (!['indigent', 'senior', 'pwd', 'student'].includes(field)) {
       return NextResponse.json({ error: 'Invalid field' }, { status: 400 })
     }
 
@@ -82,7 +82,16 @@ export async function PUT(
     const approved = action === 'APPROVE'
     const status: VerificationStatus = approved ? VerificationStatus.APPROVED : VerificationStatus.REJECTED
 
-    const data: { isIndigent?: boolean; indigentVerificationStatus?: VerificationStatus; isSeniorCitizen?: boolean; seniorVerificationStatus?: VerificationStatus; isPWD?: boolean; pwdVerificationStatus?: VerificationStatus } = {}
+    const data: {
+      isIndigent?: boolean
+      indigentVerificationStatus?: VerificationStatus
+      isSeniorCitizen?: boolean
+      seniorVerificationStatus?: VerificationStatus
+      isPWD?: boolean
+      pwdVerificationStatus?: VerificationStatus
+      isStudent?: boolean
+      studentVerificationStatus?: VerificationStatus
+    } = {}
 
     if (field === 'indigent') {
       data.isIndigent = approved
@@ -93,6 +102,9 @@ export async function PUT(
     } else if (field === 'pwd') {
       data.isPWD = approved
       data.pwdVerificationStatus = status
+    } else if (field === 'student') {
+      data.isStudent = approved
+      data.studentVerificationStatus = status
     }
 
     const updatedMember = await prisma.familyMember.update({

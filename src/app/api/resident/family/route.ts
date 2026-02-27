@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { VerificationStatus } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -29,7 +30,64 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Family not found' }, { status: 404 })
     }
 
-    return NextResponse.json(family)
+    // Compute current age from dateOfBirth and auto-approve seniors based on age
+    const now = new Date()
+    const membersToAutoApprove: string[] = []
+
+    const computedMembers = family.members.map((m: any) => {
+      let age = m.age
+
+      if (m.dateOfBirth) {
+        const birth = new Date(m.dateOfBirth)
+        age = now.getFullYear() - birth.getFullYear()
+        const monthDiff = now.getMonth() - birth.getMonth()
+        if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+          age--
+        }
+      }
+
+      let isSeniorCitizen = m.isSeniorCitizen
+      let seniorVerificationStatus = m.seniorVerificationStatus as VerificationStatus | null
+
+      if (
+        age !== null &&
+        age !== undefined &&
+        age >= 60 &&
+        seniorVerificationStatus !== VerificationStatus.APPROVED
+      ) {
+        isSeniorCitizen = true
+        seniorVerificationStatus = VerificationStatus.APPROVED
+        membersToAutoApprove.push(m.id)
+      }
+
+      return {
+        ...m,
+        age,
+        isSeniorCitizen,
+        seniorVerificationStatus
+      }
+    })
+
+    if (membersToAutoApprove.length > 0) {
+      await prisma.familyMember.updateMany({
+        where: {
+          id: {
+            in: membersToAutoApprove
+          }
+        },
+        data: {
+          isSeniorCitizen: true,
+          seniorVerificationStatus: VerificationStatus.APPROVED
+        }
+      })
+    }
+
+    const computedFamily = {
+      ...family,
+      members: computedMembers
+    }
+
+    return NextResponse.json(computedFamily)
   } catch (error) {
     console.error('Error fetching family:', error)
     return NextResponse.json(
@@ -56,6 +114,7 @@ export async function POST(request: NextRequest) {
       name,
       relation,
       age,
+      dateOfBirth,
       isIndigent,
       indigencyCertPath,
       isSeniorCitizen,
@@ -79,6 +138,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const qualifiesSeniorByAge = ageNum !== null && ageNum >= 60
+
     // Get user's family
     const family = await prisma.family.findFirst({
       where: {
@@ -95,40 +156,33 @@ export async function POST(request: NextRequest) {
         ? educationLevel
         : null
 
-    const baseData = {
-      name,
-      relation: relation.toUpperCase() as any,
-      age: ageNum,
-      isIndigent: false,
-      indigencyCertPath: indigencyCertPath || null,
-      indigentVerificationStatus: isIndigent ? 'PENDING' : null,
-      isSeniorCitizen: false,
-      seniorCardPath: seniorCardPath || null,
-      seniorVerificationStatus: isSeniorCitizen ? 'PENDING' : null,
-      isPWD: false,
-      pwdProofPath: pwdProofPath || null,
-      pwdVerificationStatus: isPWD ? 'PENDING' : null,
-      familyId: family.id
-    }
-    let familyMember
-    try {
-      familyMember = await prisma.familyMember.create({
-        data: {
-          ...baseData,
-          isStudent: !!isStudent,
-          studentIdPath: studentIdPath || null,
-          educationLevel: educationLevelValue
-        } as any
-      })
-    } catch (err: any) {
-      if (err?.message?.includes('Unknown argument') && err?.message?.includes('isStudent')) {
-        familyMember = await prisma.familyMember.create({
-          data: baseData as any
-        })
-      } else {
-        throw err
+    // Create family member; senior is auto-approved when age is 60+, otherwise follows verification flow
+    const familyMember = await prisma.familyMember.create({
+      data: {
+        name,
+        relation: relation.toUpperCase() as any,
+        age: ageNum,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        isIndigent: false,
+        indigencyCertPath: indigencyCertPath || null,
+        indigentVerificationStatus: isIndigent ? 'PENDING' : null,
+        isSeniorCitizen: qualifiesSeniorByAge || !!isSeniorCitizen,
+        seniorCardPath: seniorCardPath || null,
+        seniorVerificationStatus: qualifiesSeniorByAge
+          ? 'APPROVED'
+          : isSeniorCitizen
+            ? 'PENDING'
+            : null,
+        isPWD: false,
+        pwdProofPath: pwdProofPath || null,
+        pwdVerificationStatus: isPWD ? 'PENDING' : null,
+        isStudent: false,
+        studentIdPath: studentIdPath || null,
+        studentVerificationStatus: isStudent ? 'PENDING' : null,
+        educationLevel: educationLevelValue,
+        familyId: family.id
       }
-    }
+    })
 
     // Create audit log
     await prisma.auditLog.create({

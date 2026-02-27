@@ -57,39 +57,254 @@ export const sendScheduleNotificationToResidents = async (
       }
     }
 
-    // Build where clause for filtering residents
-    const whereClause: any = {
-      barangayId: notificationData.barangayId,
-      role: 'RESIDENT',
-      isActive: true,
-      phone: { not: null }
-    }
+    const type = notificationData.type || 'GENERAL'
 
-    // Filter by classification if specified
-    if (notificationData.targetClassification) {
-      whereClause.familyClassification = notificationData.targetClassification
-    }
+    // Decide which residents to notify based on donation type
+    let residents:
+      Array<{ id: string; firstName: string; lastName: string; phone: string | null }> = []
 
-    // Get all active residents in the barangay (filtered by classification if specified)
-    console.log('Querying residents for barangay:', notificationData.barangayId, 'with classification:', notificationData.targetClassification || 'all')
-    const residents = await prisma.user.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        familyClassification: true
+    if (type === 'GENERAL') {
+      // All active residents with phone in the barangay (optionally filtered by classification)
+      const whereClause: any = {
+        barangayId: notificationData.barangayId,
+        role: 'RESIDENT',
+        isActive: true,
+        phone: { not: null }
       }
-    })
 
-    console.log(`Found ${residents.length} residents to notify`)
-    console.log('Residents found:', residents.map(r => ({ 
-      name: `${r.firstName} ${r.lastName}`, 
-      phone: r.phone 
-    })))
+      if (notificationData.targetClassification) {
+        whereClause.familyClassification = notificationData.targetClassification
+      }
 
-    if (residents.length === 0) {
+      console.log(
+        'Querying residents for GENERAL schedule in barangay:',
+        notificationData.barangayId,
+        'classification:',
+        notificationData.targetClassification || 'all'
+      )
+
+      residents = await prisma.user.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          phone: true
+        }
+      })
+    } else if (type === 'EDUCATION') {
+      // Heads of families that have at least one APPROVED student member
+      console.log('Querying family heads for EDUCATION schedule')
+      const families = await prisma.family.findMany({
+        where: {
+          barangayId: notificationData.barangayId,
+          members: {
+            some: {
+              isStudent: true,
+              studentVerificationStatus: 'APPROVED'
+            }
+          },
+          ...(notificationData.targetClassification
+            ? {
+                head: {
+                  familyClassification: notificationData.targetClassification,
+                  phone: { not: null }
+                }
+              }
+            : {
+                head: {
+                  phone: { not: null }
+                }
+              })
+        },
+        include: {
+          head: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true
+            }
+          }
+        }
+      })
+
+      residents = families
+        .map(f => f.head)
+        .filter(h => !!h && !!h.phone) as Array<{
+          id: string
+          firstName: string
+          lastName: string
+          phone: string | null
+        }>
+    } else if (type === 'PWD') {
+      // Heads of families that have at least one APPROVED PWD member
+      console.log('Querying family heads for PWD schedule')
+      const families = await prisma.family.findMany({
+        where: {
+          barangayId: notificationData.barangayId,
+          members: {
+            some: {
+              isPWD: true,
+              pwdVerificationStatus: 'APPROVED'
+            }
+          },
+          ...(notificationData.targetClassification
+            ? {
+                head: {
+                  familyClassification: notificationData.targetClassification,
+                  phone: { not: null }
+                }
+              }
+            : {
+                head: {
+                  phone: { not: null }
+                }
+              })
+        },
+        include: {
+          head: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true
+            }
+          }
+        }
+      })
+
+      residents = families
+        .map(f => f.head)
+        .filter(h => !!h && !!h.phone) as Array<{
+          id: string
+          firstName: string
+          lastName: string
+          phone: string | null
+        }>
+    } else if (type === 'IP') {
+      // Heads of families whose head has an IP certificate
+      console.log('Querying family heads for IP schedule')
+      const families = await prisma.family.findMany({
+        where: {
+          barangayId: notificationData.barangayId,
+          head: {
+            ipCertificatePath: { not: null },
+            phone: { not: null },
+            ...(notificationData.targetClassification
+              ? { familyClassification: notificationData.targetClassification }
+              : {})
+          }
+        },
+        include: {
+          head: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true
+            }
+          }
+        }
+      })
+
+      residents = families
+        .map(f => f.head)
+        .filter(h => !!h && !!h.phone) as Array<{
+          id: string
+          firstName: string
+          lastName: string
+          phone: string | null
+        }>
+    } else if (type === 'SENIOR_CITIZEN') {
+      // Heads of families that have at least one APPROVED senior citizen member
+      console.log('Querying family heads for SENIOR_CITIZEN schedule')
+      const families = await prisma.family.findMany({
+        where: {
+          barangayId: notificationData.barangayId,
+          members: {
+            some: {
+              isSeniorCitizen: true,
+              seniorVerificationStatus: 'APPROVED'
+            }
+          },
+          ...(notificationData.targetClassification
+            ? {
+                head: {
+                  familyClassification: notificationData.targetClassification,
+                  phone: { not: null }
+                }
+              }
+            : {
+                head: {
+                  phone: { not: null }
+                }
+              })
+        },
+        include: {
+          head: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true
+            }
+          }
+        }
+      })
+
+      residents = families
+        .map(f => f.head)
+        .filter(h => !!h && !!h.phone) as Array<{
+          id: string
+          firstName: string
+          lastName: string
+          phone: string | null
+        }>
+    } else {
+      // Fallback: treat unknown types like GENERAL (notify all residents)
+      console.log('Unknown schedule type, falling back to GENERAL recipients selection')
+      const whereClause: any = {
+        barangayId: notificationData.barangayId,
+        role: 'RESIDENT',
+        isActive: true,
+        phone: { not: null }
+      }
+
+      if (notificationData.targetClassification) {
+        whereClause.familyClassification = notificationData.targetClassification
+      }
+
+      residents = await prisma.user.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          phone: true
+        }
+      })
+    }
+
+    // Deduplicate residents by ID
+    const uniqueResidentsMap = new Map<string, { id: string; firstName: string; lastName: string; phone: string | null }>()
+    for (const r of residents) {
+      if (!uniqueResidentsMap.has(r.id)) {
+        uniqueResidentsMap.set(r.id, r)
+      }
+    }
+    const uniqueResidents = Array.from(uniqueResidentsMap.values())
+
+    console.log(`Found ${uniqueResidents.length} residents to notify for type ${type}`)
+    console.log(
+      'Residents found:',
+      uniqueResidents.map(r => ({
+        name: `${r.firstName} ${r.lastName}`,
+        phone: r.phone
+      }))
+    )
+
+    if (uniqueResidents.length === 0) {
       return {
         success: true,
         sentCount: 0,
@@ -110,13 +325,15 @@ export const sendScheduleNotificationToResidents = async (
     })
 
     // Format date and time for SMS
-    const scheduleDate = schedule ? new Date(schedule.date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) : 'TBD'
-    
+    const scheduleDate = schedule
+      ? new Date(schedule.date).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+      : 'TBD'
+
     const timeRange = schedule ? `${formatTime12Hour(schedule.startTime)} - ${formatTime12Hour(schedule.endTime)}` : 'TBD'
     const location = schedule?.location || 'TBD'
 
@@ -124,7 +341,7 @@ export const sendScheduleNotificationToResidents = async (
     const smsMessage = `NEW DONATION SCHEDULE!\n\n${notificationData.title}\n\n${notificationData.message}\n\n Date: ${scheduleDate}\n🕐 Time: ${timeRange}\n📍 Location: ${location}\n\nPlease check your resident dashboard for more details.\n\n- MSWDO-GLAN CBDS`
 
     // Get phone numbers and format them for SMS gateway (international format)
-    const phoneNumbers = residents
+    const phoneNumbers = uniqueResidents
       .filter(resident => resident.phone)
       .map(resident => {
         let phone = resident.phone!

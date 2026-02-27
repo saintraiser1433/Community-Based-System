@@ -47,6 +47,8 @@ interface BarangayAnalytics {
     upcomingSchedules: number
     claimRate: number
     averageAttendance: number
+    totalStudents: number
+    totalNonStudents: number
   }
   scheduleStats: Array<{
     status: string
@@ -289,6 +291,35 @@ export default function BarangayAnalytics() {
             <div className="text-2xl font-bold">{analytics.overview.averageAttendance}%</div>
             <p className="text-xs text-muted-foreground">
               Average attendance
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Student Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Students in Barangay</CardTitle>
+            <Users className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.overview.totalStudents}</div>
+            <p className="text-xs text-muted-foreground">
+              Approved student family members
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Non‑Students</CardTitle>
+            <Users className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.overview.totalNonStudents}</div>
+            <p className="text-xs text-muted-foreground">
+              Family members without student status
             </p>
           </CardContent>
         </Card>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendSMS } from '@/lib/sms'
 
 export async function PUT(
   request: NextRequest,
@@ -93,6 +94,49 @@ export async function PUT(
         
         auditAction = 'CLAIM_COMPLETED'
         auditDetails = `Marked claim as physically claimed for ${existingClaim.schedule.title} by ${existingClaim.claimedByUser.firstName} ${existingClaim.claimedByUser.lastName}`
+
+        // Notify family head via SMS that the donation has been claimed
+        try {
+          const smsSettings = await prisma.sMSSettings.findFirst({
+            where: { isActive: true }
+          })
+
+          const head = existingClaim.family.head
+          if (smsSettings && head?.phone) {
+            let phone = head.phone.replace(/\D/g, '')
+
+            if (phone.startsWith('09')) {
+              phone = '+63' + phone.substring(1)
+            } else if (phone.startsWith('9')) {
+              phone = '+63' + phone
+            } else if (phone.startsWith('63')) {
+              phone = '+' + phone
+            } else {
+              phone = '+63' + phone
+            }
+
+            if (phone.startsWith('+63') && phone.length === 13) {
+              const claimedAt = updatedClaim.claimedAtPhysical || new Date()
+              const claimedAtText = claimedAt.toLocaleString('en-PH', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })
+
+              const claimerName = `${existingClaim.claimedByUser.firstName} ${existingClaim.claimedByUser.lastName}`
+              const smsMessage = `DONATION CLAIMED\n\nHi ${head.firstName} ${head.lastName},\n\nYour family's donation "${existingClaim.schedule.title}" has been marked as CLAIMED.\n\nClaimed by: ${claimerName}\nDate: ${claimedAtText}\n\n- MSWDO-GLAN CBDS`
+
+              await sendSMS(smsSettings.username, smsSettings.password, {
+                message: smsMessage,
+                phoneNumbers: [phone]
+              })
+            }
+          }
+        } catch (smsError) {
+          console.error('Error sending claim SMS notification:', smsError)
+        }
         break
 
       case 'reject':

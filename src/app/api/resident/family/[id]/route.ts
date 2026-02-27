@@ -52,6 +52,8 @@ export async function PUT(
       )
     }
 
+    const qualifiesSeniorByAge = ageNum !== null && ageNum >= 60
+
     // Get user's family
     const family = await prisma.family.findFirst({
       where: {
@@ -75,37 +77,84 @@ export async function PUT(
       return NextResponse.json({ error: 'Family member not found' }, { status: 404 })
     }
 
-    // Update family member. Try with student fields first; if Prisma client is old, retry without them.
-    const baseData = {
-      name,
-      relation: relation.toUpperCase() as any,
-      age: ageNum,
-      isIndigent: false,
-      indigencyCertPath: indigencyCertPath || null,
-      indigentVerificationStatus: isIndigent ? 'PENDING' : null,
-      isSeniorCitizen: false,
-      seniorCardPath: seniorCardPath || null,
-      seniorVerificationStatus: isSeniorCitizen ? 'PENDING' : null,
-      isPWD: false,
-      pwdProofPath: pwdProofPath || null,
-      pwdVerificationStatus: isPWD ? 'PENDING' : null
-    }
-    let updatedMember
-    try {
-      updatedMember = await prisma.familyMember.update({
-        where: { id },
-        data: { ...baseData, isStudent: !!isStudent, studentIdPath: studentIdPath || null, educationLevel: educationLevelValue } as any
-      })
-    } catch (err: any) {
-      if (err?.message?.includes('Unknown argument') && err?.message?.includes('isStudent')) {
-        updatedMember = await prisma.familyMember.update({
-          where: { id },
-          data: baseData as any
-        })
+    // Update family member; keep existing verification decisions unless this is a new request.
+    const wantsStudent = !!isStudent
+    const studentApproved = familyMember.studentVerificationStatus === 'APPROVED'
+
+    // Indigent – allow re-request if not approved yet
+    let nextIsIndigent = familyMember.isIndigent
+    let nextIndigentStatus = familyMember.indigentVerificationStatus
+    if (nextIndigentStatus !== 'APPROVED') {
+      if (isIndigent) {
+        nextIsIndigent = false
+        nextIndigentStatus = 'PENDING'
       } else {
-        throw err
+        nextIsIndigent = false
+        nextIndigentStatus = null
       }
     }
+
+    // Senior – auto-approve when age is 60+; otherwise follow verification flow
+    let nextIsSenior = familyMember.isSeniorCitizen
+    let nextSeniorStatus = familyMember.seniorVerificationStatus
+    if (nextSeniorStatus !== 'APPROVED') {
+      if (qualifiesSeniorByAge || !!isSeniorCitizen) {
+        nextIsSenior = true
+        nextSeniorStatus = 'APPROVED'
+      } else {
+        nextIsSenior = false
+        nextSeniorStatus = null
+      }
+    }
+
+    // PWD – allow re-request if not approved yet
+    let nextIsPWD = familyMember.isPWD
+    let nextPWDStatus = familyMember.pwdVerificationStatus
+    if (nextPWDStatus !== 'APPROVED') {
+      if (isPWD) {
+        nextIsPWD = false
+        nextPWDStatus = 'PENDING'
+      } else {
+        nextIsPWD = false
+        nextPWDStatus = null
+      }
+    }
+
+    // Student – allow re-request if not approved yet
+    let nextIsStudent = familyMember.isStudent
+    let nextStudentStatus = familyMember.studentVerificationStatus
+    if (nextStudentStatus !== 'APPROVED') {
+      if (wantsStudent) {
+        nextIsStudent = false
+        nextStudentStatus = 'PENDING'
+      } else {
+        nextIsStudent = false
+        nextStudentStatus = null
+      }
+    }
+
+    const updatedMember = await prisma.familyMember.update({
+      where: { id },
+      data: {
+        name,
+        relation: relation.toUpperCase() as any,
+        age: ageNum,
+        dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : familyMember.dateOfBirth,
+        isIndigent: nextIsIndigent,
+        indigencyCertPath: indigencyCertPath || familyMember.indigencyCertPath || null,
+        indigentVerificationStatus: nextIndigentStatus as any,
+        isSeniorCitizen: nextIsSenior,
+        seniorCardPath: seniorCardPath || familyMember.seniorCardPath || null,
+        seniorVerificationStatus: nextSeniorStatus as any,
+        isPWD: nextIsPWD,
+        pwdProofPath: pwdProofPath || familyMember.pwdProofPath || null,
+        pwdVerificationStatus: nextPWDStatus as any,
+        isStudent: studentApproved || nextIsStudent,
+        studentIdPath: studentIdPath || familyMember.studentIdPath || null,
+        studentVerificationStatus: studentApproved ? 'APPROVED' : (nextStudentStatus as any),
+        educationLevel: educationLevelValue ?? familyMember.educationLevel
+      }
+    })
 
     // Create audit log
     await prisma.auditLog.create({

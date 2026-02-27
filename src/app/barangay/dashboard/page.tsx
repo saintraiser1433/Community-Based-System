@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import BarangayAnalytics from '@/components/barangay/BarangayAnalytics'
 import Pagination from '@/components/ui/pagination'
@@ -73,6 +74,7 @@ export default function BarangayDashboard() {
   const [verifyConfirmOpen, setVerifyConfirmOpen] = useState(false)
   const [verifyConfirmMember, setVerifyConfirmMember] = useState<{ id: string; name: string } | null>(null)
   const [verifyConfirmField, setVerifyConfirmField] = useState<'indigent' | 'senior' | 'pwd' | null>(null)
+  const [verifyConfirmAction, setVerifyConfirmAction] = useState<'APPROVE' | 'REJECT'>('APPROVE')
   const [verifyConfirmLoading, setVerifyConfirmLoading] = useState(false)
   
   // Pagination states
@@ -101,7 +103,7 @@ export default function BarangayDashboard() {
     location: '',
     maxRecipients: '',
     targetClassification: 'all', // 'all', 'HIGH_CLASS', 'MIDDLE_CLASS', 'LOW_CLASS'
-    type: 'GENERAL' // 'GENERAL', 'EDUCATION', 'WHEELCHAIR', 'PWD', 'IP', 'SENIOR_CITIZEN', 'SOLO_PARENT'
+    type: 'GENERAL' // 'GENERAL', 'EDUCATION', 'PWD', 'IP', 'SENIOR_CITIZEN'
   })
 
   useEffect(() => {
@@ -423,9 +425,14 @@ export default function BarangayDashboard() {
     setShowFamilyMemberSelect(true)
   }
 
-  const openVerifyConfirm = (member: any, field: 'indigent' | 'senior' | 'pwd') => {
+  const openVerifyConfirm = (
+    member: any,
+    field: 'indigent' | 'senior' | 'pwd',
+    action: 'APPROVE' | 'REJECT' = 'APPROVE'
+  ) => {
     setVerifyConfirmMember({ id: member.id, name: member.name })
     setVerifyConfirmField(field)
+    setVerifyConfirmAction(action)
     setVerifyConfirmOpen(true)
   }
 
@@ -433,18 +440,27 @@ export default function BarangayDashboard() {
     if (!verifyConfirmMember || !verifyConfirmField || !selectedResident) return
     setVerifyConfirmLoading(true)
     try {
-      const response = await fetch('/api/barangay/family-members/' + verifyConfirmMember.id + '/verify', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ field: verifyConfirmField, action: 'APPROVE' })
-      })
+      const response = await fetch(
+        '/api/barangay/family-members/' + verifyConfirmMember.id + '/verify',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ field: verifyConfirmField, action: verifyConfirmAction })
+        }
+      )
       const data = response.ok ? await response.json().catch(() => ({})) : await response.json().catch(() => ({}))
       if (!response.ok) {
         toast.error(data.error || 'Failed to update verification')
         return
       }
-      const fieldLabel = verifyConfirmField === 'indigent' ? 'Indigent' : verifyConfirmField === 'senior' ? 'Senior Citizen' : 'PWD'
-      toast.success(`${fieldLabel} status approved`)
+      const fieldLabel =
+        verifyConfirmField === 'indigent'
+          ? 'Indigent'
+          : verifyConfirmField === 'senior'
+          ? 'Senior Citizen'
+          : 'PWD'
+      const actionLabel = verifyConfirmAction === 'APPROVE' ? 'approved' : 'rejected'
+      toast.success(`${fieldLabel} status ${actionLabel}`)
       const residentsRes = await fetch('/api/barangay/residents')
       if (residentsRes.ok) {
         const list = await residentsRes.json()
@@ -901,16 +917,13 @@ export default function BarangayDashboard() {
                               <SelectContent>
                                 <SelectItem value="GENERAL">General</SelectItem>
                                 <SelectItem value="EDUCATION">Education (School Supplies)</SelectItem>
-                                <SelectItem value="WHEELCHAIR">Wheelchair</SelectItem>
                                 <SelectItem value="PWD">PWD (Persons with Disabilities)</SelectItem>
                                 <SelectItem value="IP">IP (Indigenous People)</SelectItem>
                                 <SelectItem value="SENIOR_CITIZEN">Senior Citizen</SelectItem>
-                                <SelectItem value="SOLO_PARENT">Solo Parent</SelectItem>
                               </SelectContent>
                             </Select>
                             <p className="text-xs text-gray-500">
                               {newSchedule.type === 'EDUCATION' && 'All students (including family members) can claim'}
-                              {newSchedule.type === 'WHEELCHAIR' && 'For PWD and IP members'}
                               {newSchedule.type === 'PWD' && 'For Persons with Disabilities'}
                               {newSchedule.type === 'IP' && 'For Indigenous People'}
                             </p>
@@ -1051,11 +1064,9 @@ export default function BarangayDashboard() {
                               <SelectContent>
                                 <SelectItem value="GENERAL">General</SelectItem>
                                 <SelectItem value="EDUCATION">Education (School Supplies)</SelectItem>
-                                <SelectItem value="WHEELCHAIR">Wheelchair</SelectItem>
                                 <SelectItem value="PWD">PWD (Persons with Disabilities)</SelectItem>
                                 <SelectItem value="IP">IP (Indigenous People)</SelectItem>
                                 <SelectItem value="SENIOR_CITIZEN">Senior Citizen</SelectItem>
-                                <SelectItem value="SOLO_PARENT">Solo Parent</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1863,6 +1874,18 @@ export default function BarangayDashboard() {
                                       Senior
                                     </Badge>
                                   )}
+                                  {member.studentVerificationStatus === 'PENDING' && (
+                                    <Badge variant="outline" className="border-green-300 text-green-700">
+                                      Student - Pending
+                                    </Badge>
+                                  )}
+                                  {member.isStudent && member.studentVerificationStatus === 'APPROVED' && (
+                                    <Badge variant="outline" className="border-green-300 text-green-700">
+                                      {member.educationLevel
+                                        ? `Student (${member.educationLevel.replace('_', ' ')})`
+                                        : 'Student'}
+                                    </Badge>
+                                  )}
                                   {member.pwdVerificationStatus === 'PENDING' && (
                                     <Badge variant="outline" className="border-blue-300 text-blue-700">
                                       PWD - Pending
@@ -1875,36 +1898,207 @@ export default function BarangayDashboard() {
                                   )}
                                 </div>
 
-                                {/* Approve buttons row */}
-                                <div className="flex flex-wrap gap-2 pt-1">
-                                      {member.indigentVerificationStatus === 'PENDING' && (
-                                        <Button
-                                          size="xs"
-                                          variant="outline"
-                                          onClick={() => openVerifyConfirm(member, 'indigent')}
-                                        >
-                                          Approve Indigent
+                                {/* Review & approve popover */}
+                                {(member.indigentVerificationStatus === 'PENDING' ||
+                                  member.seniorVerificationStatus === 'PENDING' ||
+                                  member.pwdVerificationStatus === 'PENDING' ||
+                                  member.studentVerificationStatus === 'PENDING') && (
+                                  <div className="pt-1">
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button size="xs" variant="outline">
+                                          View documents & approve
                                         </Button>
-                                      )}
-                                      {member.seniorVerificationStatus === 'PENDING' && (
-                                        <Button
-                                          size="xs"
-                                          variant="outline"
-                                          onClick={() => openVerifyConfirm(member, 'senior')}
-                                        >
-                                          Approve Senior
-                                        </Button>
-                                      )}
-                                      {member.pwdVerificationStatus === 'PENDING' && (
-                                        <Button
-                                          size="xs"
-                                          variant="outline"
-                                          onClick={() => openVerifyConfirm(member, 'pwd')}
-                                        >
-                                          Approve PWD
-                                        </Button>
-                                      )}
-                                </div>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="space-y-3 text-sm w-[90vw] max-w-sm sm:max-w-md">
+                                        <p className="font-medium text-gray-800 break-words">
+                                          Verification for {member.name}
+                                        </p>
+
+                                        {member.indigentVerificationStatus === 'PENDING' && (
+                                          <div className="space-y-2 border-t pt-2">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <span className="font-semibold text-purple-700">
+                                                Indigent
+                                              </span>
+                                              <Badge variant="outline" className="border-purple-300 text-purple-700">
+                                                Pending
+                                              </Badge>
+                                            </div>
+                                            {member.indigencyCertPath ? (
+                                              <a
+                                                href={member.indigencyCertPath}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-700 underline"
+                                              >
+                                                View Certificate of Indigency
+                                              </a>
+                                            ) : (
+                                              <p className="text-xs text-gray-500">
+                                                No certificate uploaded.
+                                              </p>
+                                            )}
+                                            <div className="flex flex-col sm:flex-row justify-end gap-2 mt-2">
+                                              <Button
+                                                size="sm"
+                                                className="w-full sm:w-auto bg-black text-white hover:bg-black/90 px-4 py-2 rounded-full"
+                                                onClick={() => openVerifyConfirm(member, 'indigent', 'APPROVE')}
+                                              >
+                                                Approve
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="w-full sm:w-auto bg-white text-gray-900 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-full"
+                                                onClick={() => openVerifyConfirm(member, 'indigent', 'REJECT')}
+                                              >
+                                                Reject
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {member.seniorVerificationStatus === 'PENDING' && (
+                                          <div className="space-y-2 border-t pt-2">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <span className="font-semibold text-orange-700">
+                                                Senior Citizen
+                                              </span>
+                                              <Badge variant="outline" className="border-orange-300 text-orange-700">
+                                                Pending
+                                              </Badge>
+                                            </div>
+                                            {member.seniorCardPath ? (
+                                              <a
+                                                href={member.seniorCardPath}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-700 underline"
+                                              >
+                                                View Senior Citizen ID
+                                              </a>
+                                            ) : (
+                                              <p className="text-xs text-gray-500">
+                                                No senior ID uploaded.
+                                              </p>
+                                            )}
+                                            <div className="flex flex-col sm:flex-row justify-end gap-2 mt-2">
+                                              <Button
+                                                size="sm"
+                                                className="w-full sm:w-auto bg-black text-white hover:bg-black/90 px-4 py-2 rounded-full"
+                                                onClick={() => openVerifyConfirm(member, 'senior', 'APPROVE')}
+                                              >
+                                                Approve
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="w-full sm:w-auto bg-white text-gray-900 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-full"
+                                                onClick={() => openVerifyConfirm(member, 'senior', 'REJECT')}
+                                              >
+                                                Reject
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {member.studentVerificationStatus === 'PENDING' && (
+                                          <div className="space-y-2 border-t pt-2">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <span className="font-semibold text-green-700">
+                                                Student
+                                              </span>
+                                              <Badge variant="outline" className="border-green-300 text-green-700">
+                                                Pending
+                                              </Badge>
+                                            </div>
+                                            {member.studentIdPath ? (
+                                              <a
+                                                href={member.studentIdPath}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-700 underline"
+                                              >
+                                                View Student ID
+                                              </a>
+                                            ) : (
+                                              <p className="text-xs text-gray-500">
+                                                No student ID uploaded.
+                                              </p>
+                                            )}
+                                            {member.educationLevel && (
+                                              <p className="text-xs text-gray-600">
+                                                Education level: {member.educationLevel.replace('_', ' ')}
+                                              </p>
+                                            )}
+                                            <div className="flex flex-col sm:flex-row justify-end gap-2 mt-2">
+                                              <Button
+                                                size="sm"
+                                                className="w-full sm:w-auto bg-black text-white hover:bg-black/90 px-4 py-2 rounded-full"
+                                                onClick={() => openVerifyConfirm(member, 'student', 'APPROVE')}
+                                              >
+                                                Approve
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="w-full sm:w-auto bg-white text-gray-900 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-full"
+                                                onClick={() => openVerifyConfirm(member, 'student', 'REJECT')}
+                                              >
+                                                Reject
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {member.pwdVerificationStatus === 'PENDING' && (
+                                          <div className="space-y-2 border-t pt-2">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <span className="font-semibold text-blue-700">
+                                                PWD
+                                              </span>
+                                              <Badge variant="outline" className="border-blue-300 text-blue-700">
+                                                Pending
+                                              </Badge>
+                                            </div>
+                                            {member.pwdProofPath ? (
+                                              <a
+                                                href={member.pwdProofPath}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-700 underline"
+                                              >
+                                                View PWD Proof/ID
+                                              </a>
+                                            ) : (
+                                              <p className="text-xs text-gray-500">
+                                                No PWD proof uploaded.
+                                              </p>
+                                            )}
+                                            <div className="flex flex-col sm:flex-row justify-end gap-2 mt-2">
+                                              <Button
+                                                size="sm"
+                                                className="w-full sm:w-auto bg-black text-white hover:bg-black/90 px-4 py-2 rounded-full"
+                                                onClick={() => openVerifyConfirm(member, 'pwd', 'APPROVE')}
+                                              >
+                                                Approve
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="w-full sm:w-auto bg-white text-gray-900 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-full"
+                                                onClick={() => openVerifyConfirm(member, 'pwd', 'REJECT')}
+                                              >
+                                                Reject
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1980,8 +2174,30 @@ export default function BarangayDashboard() {
           }
         }}
         onConfirm={handleVerifyConfirm}
-        title={verifyConfirmField === 'indigent' ? 'Approve Indigent Status?' : verifyConfirmField === 'senior' ? 'Approve Senior Citizen Status?' : 'Approve PWD Status?'}
-        description={verifyConfirmMember ? `Confirm approval of ${verifyConfirmField === 'indigent' ? 'Indigent' : verifyConfirmField === 'senior' ? 'Senior Citizen' : 'PWD'} status for ${verifyConfirmMember.name}.` : ''}
+        title={
+          verifyConfirmField
+            ? `${verifyConfirmAction === 'APPROVE' ? 'Approve' : 'Reject'} ${
+                verifyConfirmField === 'indigent'
+                  ? 'Indigent'
+                  : verifyConfirmField === 'senior'
+                  ? 'Senior Citizen'
+                  : 'PWD'
+              } Status?`
+            : 'Confirm action'
+        }
+        description={
+          verifyConfirmMember && verifyConfirmField
+            ? `Are you sure you want to ${
+                verifyConfirmAction === 'APPROVE' ? 'approve' : 'reject'
+              } the ${
+                verifyConfirmField === 'indigent'
+                  ? 'Indigent'
+                  : verifyConfirmField === 'senior'
+                  ? 'Senior Citizen'
+                  : 'PWD'
+              } status for ${verifyConfirmMember.name}?`
+            : ''
+        }
         action="update"
         loading={verifyConfirmLoading}
       />

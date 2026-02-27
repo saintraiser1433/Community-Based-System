@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
       totalFamilyMembers,
       totalSchedules,
       totalClaims,
-      upcomingSchedules
+      upcomingSchedules,
+      totalStudentsBarangay
     ] = await Promise.all([
       prisma.user.count({
         where: { 
@@ -71,11 +72,20 @@ export async function GET(request: NextRequest) {
           date: { gte: new Date() },
           status: 'SCHEDULED'
         }
+      }),
+      prisma.familyMember.count({
+        where: {
+          family: {
+            barangayId: user.barangayId
+          },
+          isStudent: true
+        }
       })
     ])
 
     // Calculate claim rate
     const claimRate = totalSchedules > 0 ? Math.round((totalClaims / totalSchedules) * 100) : 0
+    const totalNonStudentsBarangay = Math.max(0, totalFamilyMembers - totalStudentsBarangay)
 
     // Calculate average attendance
     const schedulesWithMaxRecipients = await prisma.donationSchedule.findMany({
@@ -316,7 +326,9 @@ export async function GET(request: NextRequest) {
         totalClaims,
         upcomingSchedules,
         claimRate,
-        averageAttendance
+        averageAttendance,
+        totalStudents: totalStudentsBarangay,
+        totalNonStudents: totalNonStudentsBarangay
       },
       scheduleStats: scheduleStatusDistribution,
       recentSchedules: recentSchedules.map(schedule => ({

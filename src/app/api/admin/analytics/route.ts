@@ -35,14 +35,18 @@ export async function GET(request: NextRequest) {
       totalBarangays,
       totalSchedules,
       totalClaims,
-      pendingRegistrations
+      pendingRegistrations,
+      totalFamilyMembersGlobal,
+      totalStudentsGlobal
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { isActive: true } }),
       prisma.barangay.count({ where: { isActive: true } }),
       prisma.donationSchedule.count(),
       prisma.claim.count(),
-      prisma.user.count({ where: { isActive: false, role: 'RESIDENT' } })
+      prisma.user.count({ where: { isActive: false, role: 'RESIDENT' } }),
+      prisma.familyMember.count(),
+      prisma.familyMember.count({ where: { isStudent: true } })
     ])
 
     // Get user growth data using Prisma ORM (more reliable than raw SQL)
@@ -125,7 +129,8 @@ export async function GET(request: NextRequest) {
           familyMembersCount,
           schedulesCount,
           claimsCount,
-          claimedSchedulesCount
+          claimedSchedulesCount,
+          studentsCount
         ] = await Promise.all([
           prisma.user.count({ where: { barangayId: barangay.id, role: 'RESIDENT' } }),
           prisma.familyMember.count({
@@ -145,6 +150,14 @@ export async function GET(request: NextRequest) {
                 some: {}
               }
             } 
+          }),
+          prisma.familyMember.count({
+            where: {
+              family: {
+                barangayId: barangay.id
+              },
+              isStudent: true
+            }
           })
         ])
 
@@ -152,12 +165,15 @@ export async function GET(request: NextRequest) {
         const claimRate = schedulesCount > 0 
           ? Math.round((claimedSchedulesCount / schedulesCount) * 100)
           : 0
+        const nonStudentsCount = Math.max(0, familyMembersCount - studentsCount)
         
         return {
           id: barangay.id,
           name: barangay.name,
           residents: residentsCount,
           familyMembers: familyMembersCount,
+          students: studentsCount,
+          nonStudents: nonStudentsCount,
           schedules: schedulesCount,
           claims: claimsCount,
           claimRate
@@ -257,6 +273,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const totalNonStudentsGlobal = Math.max(0, totalFamilyMembersGlobal - totalStudentsGlobal)
+
     const analytics = {
       overview: {
         totalUsers,
@@ -264,7 +282,9 @@ export async function GET(request: NextRequest) {
         totalBarangays,
         totalSchedules,
         totalClaims,
-        pendingRegistrations
+        pendingRegistrations,
+        totalStudents: totalStudentsGlobal,
+        totalNonStudents: totalNonStudentsGlobal
       },
       userGrowth: userGrowth || [],
       barangayStats: barangayStatsWithRates,

@@ -48,6 +48,8 @@ interface AnalyticsData {
     totalSchedules: number
     totalClaims: number
     pendingRegistrations: number
+    totalStudents: number
+    totalNonStudents: number
   }
   userGrowth: Array<{
     month: string
@@ -59,6 +61,8 @@ interface AnalyticsData {
     name: string
     residents: number
     familyMembers: number
+    students: number
+    nonStudents: number
     schedules: number
     claims: number
     claimRate: number
@@ -306,6 +310,35 @@ export default function AnalyticsDashboard() {
         </Card>
       </div>
 
+      {/* Student Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <Users className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.overview.totalStudents}</div>
+            <p className="text-xs text-muted-foreground">
+              Approved student family members
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Non‑Students</CardTitle>
+            <Users className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.overview.totalNonStudents}</div>
+            <p className="text-xs text-muted-foreground">
+              Family members without student status
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* User Growth Chart */}
@@ -409,6 +442,41 @@ export default function AnalyticsDashboard() {
                     const payload = (entry as any).payload
                     openPopulationDialogForBarangay(payload.id, payload.name)
                   }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Students vs Non-Students per Barangay */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Students vs Non‑Students per Barangay</CardTitle>
+          <CardDescription>
+            Approved students compared to non‑students in each barangay
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={analytics.barangayStats}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar
+                  dataKey="students"
+                  stackId="stu"
+                  fill="#22c55e"
+                  name="Students"
+                />
+                <Bar
+                  dataKey="nonStudents"
+                  stackId="stu"
+                  fill="#e5e7eb"
+                  name="Non‑Students"
                 />
               </BarChart>
             </ResponsiveContainer>

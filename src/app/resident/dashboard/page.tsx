@@ -45,21 +45,22 @@ const formatTime12Hour = (time24: string): string => {
 export default function ResidentDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [donationSchedules, setDonationSchedules] = useState([])
+  const [donationSchedules, setDonationSchedules] = useState<any[]>([])
   const [familyMembers, setFamilyMembers] = useState([])
-  const [claims, setClaims] = useState([])
+  const [claims, setClaims] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showLocationModal, setShowLocationModal] = useState(false)
-  const [selectedSchedule, setSelectedSchedule] = useState(null)
+  const [selectedSchedule, setSelectedSchedule] = useState<any | null>(null)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
   const [showAddMemberConfirm, setShowAddMemberConfirm] = useState(false)
   const [showEditMemberModal, setShowEditMemberModal] = useState(false)
   const [showDeleteMemberConfirm, setShowDeleteMemberConfirm] = useState(false)
-  const [selectedMember, setSelectedMember] = useState(null)
+  const [selectedMember, setSelectedMember] = useState<any | null>(null)
   const [newMember, setNewMember] = useState({
     name: '',
     relation: '',
     age: '',
+    dateOfBirth: '',
     isIndigent: false,
     isSeniorCitizen: false,
     isPWD: false,
@@ -75,6 +76,16 @@ export default function ResidentDashboard() {
   const [pwdProofFile, setPwdProofFile] = useState<File | null>(null)
   const [studentIdFile, setStudentIdFile] = useState<File | null>(null)
   
+  // Derived flags for edit modal (prevent re-requesting already approved statuses)
+  const indigentApproved =
+    (selectedMember as any)?.indigentVerificationStatus === 'APPROVED'
+  const seniorApproved =
+    (selectedMember as any)?.seniorVerificationStatus === 'APPROVED'
+  const pwdApproved =
+    (selectedMember as any)?.pwdVerificationStatus === 'APPROVED'
+  const studentLocked =
+    (selectedMember as any)?.studentVerificationStatus === 'APPROVED'
+
   // Pagination states
   const [schedulesPage, setSchedulesPage] = useState(1)
   const [familyPage, setFamilyPage] = useState(1)
@@ -91,6 +102,16 @@ export default function ResidentDashboard() {
     if (session?.user) {
       fetchDashboardData()
     }
+  }, [session])
+
+  useEffect(() => {
+    if (!session?.user) return
+
+    const intervalId = setInterval(() => {
+      fetchDashboardData()
+    }, 5 * 1000) // Refresh every 5 seconds to pick up senior auto-approval and age changes
+
+    return () => clearInterval(intervalId)
   }, [session])
 
   const fetchDashboardData = async () => {
@@ -136,6 +157,7 @@ export default function ResidentDashboard() {
       name: '',
       relation: '',
       age: '',
+      dateOfBirth: '',
       isIndigent: false,
       isSeniorCitizen: false,
       isPWD: false,
@@ -250,19 +272,36 @@ export default function ResidentDashboard() {
     setShowAddMemberConfirm(true)
   }
 
+  const calculateAgeFromDob = (dob: string | null | undefined) => {
+    if (!dob) return ''
+    const birth = new Date(dob)
+    if (isNaN(birth.getTime())) return ''
+    const today = new Date()
+    let age = today.getFullYear() - birth.getFullYear()
+    const m = today.getMonth() - birth.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      age--
+    }
+    return age.toString()
+  }
+
   const openEditMemberModal = (member: any) => {
     setSelectedMember(member)
-    const ageStr = member.age?.toString() ?? ''
+    const dobStr = member.dateOfBirth ? member.dateOfBirth.slice(0, 10) : ''
+    const ageStr = dobStr ? calculateAgeFromDob(dobStr) : member.age?.toString() ?? ''
     const ageNum = ageStr ? parseInt(ageStr, 10) : null
     const canBeSenior = ageNum !== null && ageNum >= 60
+    const hasStudentRequest = member.studentVerificationStatus === 'PENDING'
     setNewMember({
       name: member.name,
       relation: member.relation.toLowerCase(),
       age: ageStr,
+      dateOfBirth: dobStr,
       isIndigent: !!member.isIndigent,
       isSeniorCitizen: canBeSenior && !!member.isSeniorCitizen,
       isPWD: !!member.isPWD,
-      isStudent: !!member.isStudent,
+      // Treat pending request as selected in the form so it doesn't flip back to "Not student"
+      isStudent: !!member.isStudent || hasStudentRequest,
       indigencyCertPath: member.indigencyCertPath || '',
       seniorCardPath: member.seniorCardPath || '',
       pwdProofPath: member.pwdProofPath || '',
@@ -697,7 +736,10 @@ export default function ResidentDashboard() {
                           <div>
                             <h4 className="font-semibold">{member.name}</h4>
                             <p className="text-sm text-gray-600">
-                              {member.relation} • Age: {member.age || 'N/A'}
+                              {member.relation} • Age:{' '}
+                              {member.dateOfBirth
+                                ? calculateAgeFromDob(member.dateOfBirth.slice(0, 10)) || 'N/A'
+                                : member.age || 'N/A'}
                             </p>
                             <div className="flex flex-wrap gap-2 mt-2">
                               {member.indigentVerificationStatus === 'PENDING' && (
@@ -718,6 +760,18 @@ export default function ResidentDashboard() {
                               {member.isSeniorCitizen && member.seniorVerificationStatus === 'APPROVED' && (
                                 <Badge variant="outline" className="border-orange-300 text-orange-700">
                                   Senior Citizen
+                                </Badge>
+                              )}
+                              {member.studentVerificationStatus === 'PENDING' && (
+                                <Badge variant="outline" className="border-green-300 text-green-700">
+                                  Student - Pending Approval
+                                </Badge>
+                              )}
+                              {member.isStudent && member.studentVerificationStatus === 'APPROVED' && (
+                                <Badge variant="outline" className="border-green-300 text-green-700">
+                                  {member.educationLevel
+                                    ? `Student (${member.educationLevel.replace('_', ' ')})`
+                                    : 'Student'}
                                 </Badge>
                               )}
                               {member.pwdVerificationStatus === 'PENDING' && (
@@ -786,6 +840,25 @@ export default function ResidentDashboard() {
                                     {member.pwdVerificationStatus === 'PENDING' && 'Pending'}
                                     {member.pwdVerificationStatus === 'REJECTED' && 'Rejected'}
                                     {!member.pwdVerificationStatus && 'Not submitted for approval'}
+                                    )
+                                  </span>
+                                </div>
+                              )}
+                              {member.studentIdPath && (
+                                <div>
+                                  <Link
+                                    href={member.studentIdPath}
+                                    target="_blank"
+                                    className="text-green-700 underline"
+                                  >
+                                    View Student ID
+                                  </Link>
+                                  <span className="ml-2 text-gray-600">
+                                    (
+                                    {member.studentVerificationStatus === 'APPROVED' && 'Approved'}
+                                    {member.studentVerificationStatus === 'PENDING' && 'Pending'}
+                                    {member.studentVerificationStatus === 'REJECTED' && 'Rejected'}
+                                    {!member.studentVerificationStatus && 'Not submitted for approval'}
                                     )
                                   </span>
                                 </div>
@@ -991,24 +1064,37 @@ export default function ResidentDashboard() {
               </Select>
             </div>
             
-            <div>
-              <Label htmlFor="age">Age (Optional)</Label>
-              <Input
-                id="age"
-                type="number"
-                placeholder="Enter age"
-                value={newMember.age}
-                onChange={(e) => {
-                  const val = e.target.value
-                  const num = val ? parseInt(val, 10) : null
-                  const canBeSenior = num !== null && num >= 60
-                  setNewMember({
-                    ...newMember,
-                    age: val,
-                    ...(newMember.isSeniorCitizen && !canBeSenior ? { isSeniorCitizen: false } : {})
-                  })
-                }}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="dob">Date of Birth</Label>
+                <Input
+                  id="dob"
+                  type="date"
+                  value={newMember.dateOfBirth}
+                  onChange={(e) => {
+                    const dob = e.target.value
+                    const ageStr = calculateAgeFromDob(dob)
+                    const num = ageStr ? parseInt(ageStr, 10) : null
+                    const canBeSenior = num !== null && num >= 60
+                    setNewMember({
+                      ...newMember,
+                      dateOfBirth: dob,
+                      age: ageStr,
+                      ...(newMember.isSeniorCitizen && !canBeSenior ? { isSeniorCitizen: false } : {})
+                    })
+                  }}
+                />
+              </div>
+              <div>
+                <Label htmlFor="age">Age (auto from DOB)</Label>
+                <Input
+                  id="age"
+                  type="number"
+                  value={newMember.age}
+                  disabled
+                  className="bg-gray-100"
+                />
+              </div>
             </div>
 
             <div className="space-y-3 pt-2">
@@ -1316,24 +1402,37 @@ export default function ResidentDashboard() {
               </Select>
             </div>
             
-            <div>
-              <Label htmlFor="edit-age">Age (Optional)</Label>
-              <Input
-                id="edit-age"
-                type="number"
-                placeholder="Enter age"
-                value={newMember.age}
-                onChange={(e) => {
-                  const val = e.target.value
-                  const num = val ? parseInt(val, 10) : null
-                  const canBeSenior = num !== null && num >= 60
-                  setNewMember({
-                    ...newMember,
-                    age: val,
-                    ...(newMember.isSeniorCitizen && !canBeSenior ? { isSeniorCitizen: false } : {})
-                  })
-                }}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="edit-dob">Date of Birth</Label>
+                <Input
+                  id="edit-dob"
+                  type="date"
+                  value={newMember.dateOfBirth}
+                  onChange={(e) => {
+                    const dob = e.target.value
+                    const ageStr = calculateAgeFromDob(dob)
+                    const num = ageStr ? parseInt(ageStr, 10) : null
+                    const canBeSenior = num !== null && num >= 60
+                    setNewMember({
+                      ...newMember,
+                      dateOfBirth: dob,
+                      age: ageStr,
+                      ...(newMember.isSeniorCitizen && !canBeSenior ? { isSeniorCitizen: false } : {})
+                    })
+                  }}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-age">Age (auto from DOB)</Label>
+                <Input
+                  id="edit-age"
+                  type="number"
+                  value={newMember.age}
+                  disabled
+                  className="bg-gray-100"
+                />
+              </div>
             </div>
 
             <div className="space-y-3 pt-2">
@@ -1342,13 +1441,23 @@ export default function ResidentDashboard() {
                   id="edit-isIndigent"
                   type="checkbox"
                   checked={newMember.isIndigent}
+                  disabled={indigentApproved}
                   onChange={(e) =>
                     setNewMember({ ...newMember, isIndigent: e.target.checked })
                   }
                   className="h-4 w-4"
                 />
-                <Label htmlFor="edit-isIndigent" className="cursor-pointer">
-                  Is Indigent? (requires Certificate of Indigency)
+                <Label
+                  htmlFor="edit-isIndigent"
+                  className={
+                    indigentApproved
+                      ? 'cursor-not-allowed text-muted-foreground'
+                      : 'cursor-pointer'
+                  }
+                >
+                  Is Indigent? (requires Certificate of Indigency
+                  {indigentApproved ? ' - already approved' : ''}
+                  )
                 </Label>
               </div>
               {newMember.isIndigent && (
@@ -1371,6 +1480,7 @@ export default function ResidentDashboard() {
                   type="checkbox"
                   checked={newMember.isSeniorCitizen}
                   disabled={
+                    seniorApproved ||
                     newMember.age === '' ||
                     isNaN(parseInt(newMember.age, 10)) ||
                     parseInt(newMember.age, 10) < 60
@@ -1383,12 +1493,16 @@ export default function ResidentDashboard() {
                 <Label
                   htmlFor="edit-isSeniorCitizen"
                   className={
-                    newMember.age === '' || parseInt(newMember.age, 10) < 60
+                    seniorApproved ||
+                    newMember.age === '' ||
+                    parseInt(newMember.age, 10) < 60
                       ? 'cursor-not-allowed text-muted-foreground'
                       : 'cursor-pointer'
                   }
                 >
-                  Is Senior Citizen? (requires Senior Citizen ID, age 60+)
+                  Is Senior Citizen? (requires Senior Citizen ID, age 60+
+                  {seniorApproved ? ', already approved' : ''}
+                  )
                 </Label>
               </div>
               {newMember.isSeniorCitizen && (
@@ -1413,6 +1527,7 @@ export default function ResidentDashboard() {
                       type="radio"
                       name="edit-studentStatus"
                       checked={newMember.isStudent}
+                      disabled={studentLocked}
                       onChange={() =>
                         setNewMember({ ...newMember, isStudent: true })
                       }
@@ -1425,6 +1540,7 @@ export default function ResidentDashboard() {
                       type="radio"
                       name="edit-studentStatus"
                       checked={!newMember.isStudent}
+                      disabled={studentLocked}
                       onChange={() => {
                         setNewMember({
                           ...newMember,
@@ -1449,6 +1565,7 @@ export default function ResidentDashboard() {
                         id="edit-studentId"
                         type="file"
                         accept=".jpg,.jpeg,.png,.pdf"
+                        disabled={studentLocked}
                         onChange={(e) => setStudentIdFile(e.target.files?.[0] || null)}
                       />
                     </div>
@@ -1456,6 +1573,7 @@ export default function ResidentDashboard() {
                       <Label htmlFor="edit-educationLevel">Education level *</Label>
                       <Select
                         value={newMember.educationLevel}
+                        disabled={studentLocked}
                         onValueChange={(value) =>
                           setNewMember({ ...newMember, educationLevel: value })
                         }
@@ -1479,13 +1597,21 @@ export default function ResidentDashboard() {
                   id="edit-isPWD"
                   type="checkbox"
                   checked={newMember.isPWD}
+                  disabled={pwdApproved}
                   onChange={(e) =>
                     setNewMember({ ...newMember, isPWD: e.target.checked })
                   }
                   className="h-4 w-4"
                 />
-                <Label htmlFor="edit-isPWD" className="cursor-pointer">
-                  Is PWD? (requires PWD proof/ID)
+                <Label
+                  htmlFor="edit-isPWD"
+                  className={
+                    pwdApproved ? 'cursor-not-allowed text-muted-foreground' : 'cursor-pointer'
+                  }
+                >
+                  Is PWD? (requires PWD proof/ID
+                  {pwdApproved ? ' - already approved' : ''}
+                  )
                 </Label>
               </div>
               {newMember.isPWD && (

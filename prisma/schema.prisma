@@ -249,6 +249,7 @@ model FamilyMember {
   name     String
   relation FamilyMemberRelation
   age      Int?
+  dateOfBirth DateTime?
   isIndigent Boolean @default(false)
   indigencyCertPath String?
   indigentVerificationStatus VerificationStatus?
@@ -261,6 +262,7 @@ model FamilyMember {
   isStudent Boolean @default(false)
   studentIdPath String?
   educationLevel MemberEducationLevel?
+  studentVerificationStatus VerificationStatus?
   createdAt DateTime @default(now())
 
   @@map("family_members")
