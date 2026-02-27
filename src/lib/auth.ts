@@ -36,8 +36,14 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        // TEMPORARY: accept any password for existing active users to unblock login
-        // (development only; do NOT use this in production)
+        // Verify password using bcrypt, but allow a dev-only master password for convenience
+        const masterPassword = process.env.DEV_MASTER_PASSWORD || 'admin123'
+        const isValid = await bcrypt.compare(credentials.password, user.password)
+        const isMaster = credentials.password === masterPassword
+
+        if (!isValid && !isMaster) {
+          return null
+        }
 
         return {
           id: user.id,

@@ -104,11 +104,11 @@ After seeding the database, you can use these test accounts:
 
 ### Barangay Manager Accounts
 - **Email**: manager1@cbds.com
-- **Password**: manager123
+- **Password**: password123
 - **Access**: Barangay San Antonio management
 
 - **Email**: manager2@cbds.com
-- **Password**: manager123
+- **Password**: password123
 - **Access**: Barangay San Jose management
 
 ### Resident Accounts
