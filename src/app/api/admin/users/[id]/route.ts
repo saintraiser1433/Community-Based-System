@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { nextMswdoSequence } from '@/lib/mswdo-id'
 
 export async function GET(
   request: NextRequest,
@@ -95,51 +96,78 @@ export async function PUT(
       }
     }
 
-    // Validate barangayId for BARANGAY role
-    let validatedBarangayId = null
+    // Validate barangayId per role
+    let validatedBarangayId: string | null = null
     if (role === 'BARANGAY') {
       if (!barangayId || barangayId === '' || barangayId === 'none') {
         return NextResponse.json({ error: 'Barangay is required for Barangay Manager role' }, { status: 400 })
       }
-      
-      // Check if barangay exists
+
       const barangay = await prisma.barangay.findUnique({
         where: { id: barangayId }
       })
-      
+
       if (!barangay) {
         return NextResponse.json({ error: 'Selected barangay does not exist' }, { status: 400 })
       }
-      
+
       validatedBarangayId = barangayId
     } else if (role === 'ADMIN') {
-      // Admin users don't need a barangay
       validatedBarangayId = null
-    }
-
-    // Prepare update data
-    const updateData: any = {
-      email,
-      firstName,
-      lastName,
-      phone,
-      role,
-      barangayId: validatedBarangayId,
-      isActive
-    }
-
-    // Hash new password if provided
-    if (password) {
-      updateData.password = await bcrypt.hash(password, 12)
-    }
-
-    // Update user
-    const user = await prisma.user.update({
-      where: { id },
-      data: updateData,
-      include: {
-        barangay: true
+    } else if (role === 'RESIDENT') {
+      const next =
+        barangayId && barangayId !== '' && barangayId !== 'none'
+          ? barangayId
+          : existingUser.barangayId
+      validatedBarangayId = next ?? null
+      if (validatedBarangayId) {
+        const barangay = await prisma.barangay.findUnique({
+          where: { id: validatedBarangayId }
+        })
+        if (!barangay) {
+          return NextResponse.json({ error: 'Selected barangay does not exist' }, { status: 400 })
+        }
       }
+    }
+
+    // Hash new password if provided (before transaction)
+    let passwordHash: string | undefined
+    if (password) {
+      passwordHash = await bcrypt.hash(password, 12)
+    }
+
+    const user = await prisma.$transaction(async (tx) => {
+      let mswdoSequence: number | null
+      if (role === 'RESIDENT') {
+        mswdoSequence =
+          existingUser.mswdoSequence != null
+            ? existingUser.mswdoSequence
+            : await nextMswdoSequence(tx)
+      } else {
+        mswdoSequence = null
+      }
+
+      const updateData: Record<string, unknown> = {
+        email,
+        firstName,
+        lastName,
+        phone,
+        role,
+        barangayId: validatedBarangayId,
+        isActive,
+        mswdoSequence
+      }
+      if (passwordHash) {
+        updateData.password = passwordHash
+      }
+
+      return tx.user.update({
+        where: { id },
+        data: updateData,
+        include: {
+          barangay: true
+        }
+      })
     })
 
     // Handle barangay manager assignment

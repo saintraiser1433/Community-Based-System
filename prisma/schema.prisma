@@ -136,6 +136,8 @@ model User {
   // Resident specific fields
   barangayId String?
   barangay   Barangay? @relation(fields: [barangayId], references: [id])
+  /** Public ID: MSWDO-0001 … assigned once at registration; null for staff */
+  mswdoSequence Int? @unique
   
   // Personal Information
   gender      Gender?

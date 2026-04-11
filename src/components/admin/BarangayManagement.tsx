@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Edit, Trash2, Search, MapPin, Users, Calendar } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, MapPin, Users, Calendar, CreditCard } from 'lucide-react'
+import { downloadUserIdCardPdf } from '@/lib/id-card-pdf'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import Pagination from '@/components/ui/pagination'
 import toast from 'react-hot-toast'
@@ -21,6 +22,7 @@ interface Barangay {
   description: string
   isActive: boolean
   manager?: {
+    id: string
     firstName: string
     lastName: string
     email: string
@@ -249,6 +251,23 @@ export default function BarangayManagement() {
     setShowEditBarangay(true)
   }
 
+  const handleManagerIdCard = async (barangay: Barangay) => {
+    if (!barangay.manager?.id) return
+    try {
+      await downloadUserIdCardPdf({
+        id: barangay.manager.id,
+        firstName: barangay.manager.firstName,
+        lastName: barangay.manager.lastName,
+        role: 'BARANGAY',
+        barangayName: barangay.name
+      })
+      toast.success('Barangay manager ID card PDF downloaded')
+    } catch (e) {
+      console.error(e)
+      toast.error('Failed to generate ID card')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -367,9 +386,22 @@ export default function BarangayManagement() {
                     </TableCell>
                     <TableCell>
                       {barangay.manager ? (
-                        <div>
-                          <div className="font-medium">{barangay.manager.firstName} {barangay.manager.lastName}</div>
-                          <div className="text-sm text-gray-500">{barangay.manager.email}</div>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="font-medium">{barangay.manager.firstName} {barangay.manager.lastName}</div>
+                            <div className="text-sm text-gray-500">{barangay.manager.email}</div>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-8"
+                            title="Generate manager ID card PDF (admin only; photo blank)"
+                            onClick={() => handleManagerIdCard(barangay)}
+                          >
+                            <CreditCard className="h-3 w-3 mr-1" />
+                            ID PDF
+                          </Button>
                         </div>
                       ) : (
                         <span className="text-gray-400">No Manager</span>

@@ -25,13 +25,23 @@ export async function GET(request: NextRequest) {
     const limit = Number.isNaN(limitParsed) || limitParsed < 1 ? 10 : limitParsed
     const role = searchParams.get('role')
     const search = searchParams.get('search')
+    const module = searchParams.get('module') // 'staff' | 'residents' — separates admin/barangay from residents
+    const barangayId = searchParams.get('barangayId')
 
-    const where: any = {}
-    if (role && role !== 'all') {
+    const where: Record<string, unknown> = {}
+
+    if (module === 'staff') {
+      where.role = { in: ['ADMIN', 'BARANGAY'] }
+    } else if (module === 'residents') {
+      where.role = 'RESIDENT'
+      if (barangayId && barangayId !== 'all') {
+        where.barangayId = barangayId
+      }
+    } else if (role && role !== 'all') {
       where.role = role
     }
+
     if (search) {
-      // Use simple "contains" filters compatible with current Prisma client
       where.OR = [
         { firstName: { contains: search } },
         { lastName: { contains: search } },

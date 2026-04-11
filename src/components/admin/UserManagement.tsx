@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Edit, Trash2, Eye, Search, UserCheck, UserX } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, Search, UserCheck, UserX, CreditCard } from 'lucide-react'
+import { downloadUserIdCardPdf, canGenerateIdCard } from '@/lib/id-card-pdf'
+import { formatMswdoId } from '@/lib/mswdo-id'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import Pagination from '@/components/ui/pagination'
 import toast from 'react-hot-toast'
@@ -22,7 +25,10 @@ interface User {
   phone: string
   role: string
   isActive: boolean
+  /** Resident public ID; staff users omit this */
+  mswdoSequence?: number | null
   barangay?: {
+    id: string
     name: string
   }
   createdAt: string
@@ -42,7 +48,9 @@ export default function UserManagement() {
   const [showEditUser, setShowEditUser] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
+  /** Staff = admin + barangay managers; residents = separate list with barangay filter */
+  const [listModule, setListModule] = useState<'staff' | 'residents'>('staff')
+  const [barangayFilter, setBarangayFilter] = useState<string>('all')
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -63,7 +71,8 @@ export default function UserManagement() {
     lastName: '',
     phone: '',
     role: 'RESIDENT',
-    barangayId: ''
+    barangayId: '',
+    isActive: true
   })
 
   useEffect(() => {
@@ -71,21 +80,26 @@ export default function UserManagement() {
     fetchBarangays()
   }, [])
 
-  // Handle search and filter changes
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setCurrentPage(1)
       fetchUsers(1)
-    }, 500) // Debounce search
-
+    }, 400)
     return () => clearTimeout(timeoutId)
-  }, [searchTerm, roleFilter])
+  }, [searchTerm, listModule, barangayFilter])
 
   const fetchUsers = async (page = currentPage) => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams()
-      if (roleFilter !== 'all') params.append('role', roleFilter)
+      if (listModule === 'staff') {
+        params.append('module', 'staff')
+      } else {
+        params.append('module', 'residents')
+        if (barangayFilter !== 'all') {
+          params.append('barangayId', barangayFilter)
+        }
+      }
       if (searchTerm) params.append('search', searchTerm)
       params.append('page', page.toString())
       params.append('limit', itemsPerPage.toString())
@@ -226,7 +240,8 @@ export default function UserManagement() {
       lastName: '',
       phone: '',
       role: 'RESIDENT',
-      barangayId: ''
+      barangayId: '',
+      isActive: true
     })
     setSelectedUser(null)
   }
@@ -245,7 +260,8 @@ export default function UserManagement() {
       lastName: user.lastName,
       phone: user.phone || '',
       role: user.role,
-      barangayId: user.barangay?.id || ''
+      barangayId: user.barangay?.id || '',
+      isActive: user.isActive
     })
     setShowEditUser(true)
   }
@@ -259,6 +275,30 @@ export default function UserManagement() {
     }
   }
 
+  const handleGenerateIdCard = async (user: User) => {
+    if (!canGenerateIdCard(user.role, user.isActive)) {
+      toast.error('ID cards can only be generated for approved (active) residents.')
+      return
+    }
+    try {
+      await downloadUserIdCardPdf({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        barangayName: user.barangay?.name ?? null,
+        mswdoSequence: user.mswdoSequence ?? null,
+        isActive: user.isActive
+      })
+      toast.success('ID card PDF downloaded')
+    } catch (e) {
+      console.error(e)
+      toast.error(
+        e instanceof Error ? e.message : 'Failed to generate ID card'
+      )
+    }
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <Card>
@@ -267,9 +307,10 @@ export default function UserManagement() {
             <div>
               <CardTitle className="text-lg sm:text-xl">User Management</CardTitle>
               <CardDescription className="text-sm">
-                Manage system users and their roles
+                Staff (admin & barangay) and residents are listed separately. Filter residents by barangay.
               </CardDescription>
             </div>
+            {listModule === 'staff' && (
             <Dialog open={showCreateUser} onOpenChange={(open) => {
               setShowCreateUser(open)
               if (!open) resetUserForm()
@@ -379,37 +420,74 @@ export default function UserManagement() {
                 </form>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </CardHeader>
         <CardContent>
+          <Tabs
+            value={listModule}
+            onValueChange={(v) => {
+              setListModule(v as 'staff' | 'residents')
+              setCurrentPage(1)
+            }}
+            className="w-full"
+          >
+            <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+              <TabsTrigger value="staff">Staff (Admin & Barangay)</TabsTrigger>
+              <TabsTrigger value="residents">Residents</TabsTrigger>
+            </TabsList>
+            <TabsContent value="staff" className="mt-0 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                System administrators and barangay managers. Use Add User to create new staff accounts.
+              </p>
+            </TabsContent>
+            <TabsContent value="residents" className="mt-0 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Registered residents. Approve new registrations under Pending Registrations. Filter by barangay below.
+              </p>
+            </TabsContent>
+          </Tabs>
+
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4 mb-6">
             <div className="flex-1">
               <div className="relative">
                 <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
                 <Input
-                  placeholder="Search users..."
+                  placeholder="Search by name or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            <Select value={roleFilter} onValueChange={(value) => {
-              setRoleFilter(value)
-              setCurrentPage(1)
-              fetchUsers(1)
-            }}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="ADMIN">Admin</SelectItem>
-                <SelectItem value="BARANGAY">Barangay Manager</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={() => fetchUsers(1)}>Search</Button>
+            {listModule === 'residents' && (
+              <div className="w-full lg:w-64">
+                <Label className="sr-only">Barangay</Label>
+                <Select
+                  value={barangayFilter}
+                  onValueChange={(v) => {
+                    setBarangayFilter(v)
+                    setCurrentPage(1)
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All barangays" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All barangays</SelectItem>
+                    {barangays.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <Button type="button" variant="secondary" onClick={() => fetchUsers(1)}>
+              Refresh
+            </Button>
           </div>
 
           {/* Users Table */}
@@ -421,10 +499,12 @@ export default function UserManagement() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>ID No.</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Barangay</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>ID Card</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -433,6 +513,11 @@ export default function UserManagement() {
                   <TableRow key={user.id}>
                     <TableCell>
                       {user.firstName} {user.lastName}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm whitespace-nowrap">
+                      {user.role === 'RESIDENT' && user.mswdoSequence != null
+                        ? formatMswdoId(user.mswdoSequence)
+                        : '—'}
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
@@ -453,6 +538,22 @@ export default function UserManagement() {
                           Inactive
                         </Badge>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!canGenerateIdCard(user.role, user.isActive)}
+                        title={
+                          !canGenerateIdCard(user.role, user.isActive)
+                            ? 'Only approved residents can receive an ID card'
+                            : 'Generate ID card PDF (photo blank)'
+                        }
+                        onClick={() => handleGenerateIdCard(user)}
+                      >
+                        <CreditCard className="h-4 w-4 mr-1" />
+                        PDF
+                      </Button>
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -552,6 +653,21 @@ export default function UserManagement() {
                     placeholder="Enter phone number"
                   />
                 </div>
+                {userForm.role === 'RESIDENT' && (
+                  <div>
+                    <Label htmlFor="edit-mswdo">MSWDO ID</Label>
+                    <Input
+                      id="edit-mswdo"
+                      readOnly
+                      className="font-mono bg-muted"
+                      value={
+                        selectedUser?.mswdoSequence != null
+                          ? formatMswdoId(selectedUser.mswdoSequence)
+                          : 'Not assigned yet — saved on next update'
+                      }
+                    />
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="edit-role">Role</Label>
                   <Select value={userForm.role} onValueChange={(value) => setUserForm({ ...userForm, role: value })}>
@@ -561,10 +677,11 @@ export default function UserManagement() {
                     <SelectContent>
                       <SelectItem value="ADMIN">Admin</SelectItem>
                       <SelectItem value="BARANGAY">Barangay Manager</SelectItem>
+                      <SelectItem value="RESIDENT">Resident</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                {userForm.role === 'BARANGAY' && (
+                {(userForm.role === 'BARANGAY' || userForm.role === 'RESIDENT') && (
                   <div>
                     <Label htmlFor="edit-barangayId">Barangay</Label>
                     <Select value={userForm.barangayId} onValueChange={(value) => setUserForm({ ...userForm, barangayId: value })}>
@@ -579,6 +696,20 @@ export default function UserManagement() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                )}
+                {userForm.role === 'RESIDENT' && (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      id="edit-isActive"
+                      type="checkbox"
+                      checked={userForm.isActive}
+                      onChange={(e) => setUserForm({ ...userForm, isActive: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="edit-isActive" className="cursor-pointer">
+                      Account active (approved resident)
+                    </Label>
                   </div>
                 )}
                 <div className="flex justify-end space-x-2">

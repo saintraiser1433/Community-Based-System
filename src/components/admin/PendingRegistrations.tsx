@@ -10,9 +10,11 @@ import { CheckCircle, XCircle, User, MapPin, Calendar, Mail, Phone, Eye, FileTex
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import Pagination from '@/components/ui/pagination'
 import toast from 'react-hot-toast'
+import { downloadUserIdCardPdf } from '@/lib/id-card-pdf'
 
 interface PendingRegistration {
   id: string
+  mswdoSequence?: number | null
   firstName: string
   lastName: string
   email: string
@@ -235,8 +237,27 @@ export default function PendingRegistrations() {
       })
       
       if (response.ok) {
+        const approved = selectedRegistration
+        try {
+          if (approved) {
+            await downloadUserIdCardPdf({
+              id: approved.id,
+              firstName: approved.firstName,
+              lastName: approved.lastName,
+              role: 'RESIDENT',
+              barangayName: approved.barangay?.name ?? null,
+              mswdoSequence: approved.mswdoSequence ?? null,
+              isActive: true
+            })
+            toast.success('Registration approved — ID card PDF downloaded')
+          } else {
+            toast.success('Registration approved successfully')
+          }
+        } catch (idErr) {
+          console.error(idErr)
+          toast.success('Registration approved (ID card PDF could not be generated — use User Management)')
+        }
         await fetchPendingRegistrations()
-        toast.success('Registration approved successfully')
         setShowApproveConfirm(false)
         setShowDetailsModal(false)
         setSelectedRegistration(null)

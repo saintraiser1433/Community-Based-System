@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { nextMswdoSequence } from '@/lib/mswdo-id'
 
 export async function POST(request: NextRequest) {
   try {
@@ -113,8 +114,10 @@ export async function POST(request: NextRequest) {
     const addressParts = [purok, barangay.name, municipality].filter(Boolean)
     const address = addressParts.join(', ')
 
-    // Create user (inactive by default for residents)
-    const user = await prisma.user.create({
+    // Create user (inactive by default for residents) + family in one transaction; MSWDO ID assigned here
+    const user = await prisma.$transaction(async (tx) => {
+      const seq = await nextMswdoSequence(tx)
+      const created = await tx.user.create({
       data: {
         firstName,
         lastName,
@@ -124,6 +127,7 @@ export async function POST(request: NextRequest) {
         role: 'RESIDENT',
         isActive: false, // Inactive until approved by admin
         barangayId,
+        mswdoSequence: seq,
         
         // Personal Information
         gender: gender && gender !== '' ? gender : null,
@@ -173,15 +177,17 @@ export async function POST(request: NextRequest) {
         idFilePath: idFilePath || null,
         idBackFilePath: idBackFilePath || null,
       }
-    })
+      })
 
-    // Create a family record
-    await prisma.family.create({
-      data: {
-        headId: user.id,
-        barangayId,
-        address: address || 'Address not provided'
-      }
+      await tx.family.create({
+        data: {
+          headId: created.id,
+          barangayId,
+          address: address || 'Address not provided'
+        }
+      })
+
+      return created
     })
 
     return NextResponse.json(

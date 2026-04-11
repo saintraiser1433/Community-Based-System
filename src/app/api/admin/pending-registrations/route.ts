@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     // Transform the data to include all registration fields
     const transformedRegistrations = pendingRegistrations.map(registration => ({
       id: registration.id,
+      mswdoSequence: registration.mswdoSequence,
       firstName: registration.firstName,
       lastName: registration.lastName,
       email: registration.email,
