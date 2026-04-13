@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { nextMswdoSequence } from '@/lib/mswdo-id'
 
 export async function GET(request: NextRequest) {
   try {
@@ -115,10 +116,28 @@ export async function PUT(request: NextRequest) {
     }
 
     if (action === 'approve') {
-      // Activate the user
-      await prisma.user.update({
-        where: { id: userId },
-        data: { isActive: true }
+      // Activate the user and backfill public ID when missing.
+      await prisma.$transaction(async (tx) => {
+        const existingUser = await tx.user.findUnique({
+          where: { id: userId },
+          select: { role: true, mswdoSequence: true }
+        })
+
+        if (!existingUser) {
+          throw new Error('USER_NOT_FOUND')
+        }
+
+        const needsSequence =
+          existingUser.role === 'RESIDENT' && existingUser.mswdoSequence == null
+        const mswdoSequence = needsSequence ? await nextMswdoSequence(tx) : undefined
+
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            isActive: true,
+            ...(mswdoSequence != null ? { mswdoSequence } : {})
+          }
+        })
       })
 
       // Create audit log
@@ -212,6 +231,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
   } catch (error) {
+    if (error instanceof Error && error.message === 'USER_NOT_FOUND') {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
     console.error('Error processing registration:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

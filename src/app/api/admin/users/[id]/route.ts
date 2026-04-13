@@ -138,7 +138,7 @@ export async function PUT(
 
     const user = await prisma.$transaction(async (tx) => {
       let mswdoSequence: number | null
-      if (role === 'RESIDENT') {
+      if (role === 'RESIDENT' || role === 'BARANGAY') {
         mswdoSequence =
           existingUser.mswdoSequence != null
             ? existingUser.mswdoSequence

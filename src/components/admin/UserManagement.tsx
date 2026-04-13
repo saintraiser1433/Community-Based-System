@@ -515,7 +515,7 @@ export default function UserManagement() {
                       {user.firstName} {user.lastName}
                     </TableCell>
                     <TableCell className="font-mono text-sm whitespace-nowrap">
-                      {user.role === 'RESIDENT' && user.mswdoSequence != null
+                      {user.mswdoSequence != null
                         ? formatMswdoId(user.mswdoSequence)
                         : '—'}
                     </TableCell>

@@ -149,10 +149,7 @@ export async function downloadUserIdCardPdf(data: IdCardData): Promise<void> {
 
   pdf.setFontSize(6.5)
   pdf.setTextColor(148, 163, 184)
-  const idDisplay =
-    data.role === 'RESIDENT' && data.mswdoSequence != null
-      ? formatMswdoId(data.mswdoSequence)
-      : data.id
+  const idDisplay = data.mswdoSequence != null ? formatMswdoId(data.mswdoSequence) : data.id
   const idLines = pdf.splitTextToSize(`ID No.: ${idDisplay}`, textMaxW)
   pdf.text(idLines, colX, y)
   y += idLines.length * 3.2
@@ -165,7 +162,7 @@ export async function downloadUserIdCardPdf(data: IdCardData): Promise<void> {
   pdf.text(`Issued: ${issued}`, colX, Math.min(y + 1, cardH - 3))
 
   const fileSlug =
-    data.role === 'RESIDENT' && data.mswdoSequence != null
+    data.mswdoSequence != null
       ? formatMswdoId(data.mswdoSequence)
       : `CBDS-ID-${data.id.slice(0, 8)}`
   pdf.save(`${fileSlug}.pdf`)

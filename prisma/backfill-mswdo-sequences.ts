@@ -1,5 +1,6 @@
 /**
- * One-off: assign MSWDO sequence numbers to existing residents that have none.
+ * One-off: assign MSWDO sequence numbers to users that have none.
+ * Targets residents and barangay managers.
  * Run: npx tsx prisma/backfill-mswdo-sequences.ts
  */
 import { PrismaClient } from '@prisma/client'
@@ -8,9 +9,12 @@ const prisma = new PrismaClient()
 
 async function main() {
   const missing = await prisma.user.findMany({
-    where: { role: 'RESIDENT', mswdoSequence: null },
+    where: {
+      role: { in: ['RESIDENT', 'BARANGAY'] },
+      mswdoSequence: null
+    },
     orderBy: { createdAt: 'asc' },
-    select: { id: true }
+    select: { id: true, role: true, email: true }
   })
 
   const agg = await prisma.user.aggregate({
@@ -24,11 +28,13 @@ async function main() {
       where: { id: u.id },
       data: { mswdoSequence: next }
     })
-    console.log(`Assigned MSWDO-${String(next).padStart(4, '0')} to ${u.id}`)
+    console.log(
+      `Assigned MSWDO-${String(next).padStart(4, '0')} to ${u.role} ${u.email} (${u.id})`
+    )
     next += 1
   }
 
-  console.log(`Done. Updated ${missing.length} resident(s).`)
+  console.log(`Done. Updated ${missing.length} user(s).`)
 }
 
 main()

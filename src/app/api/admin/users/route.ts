@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { nextMswdoSequence } from '@/lib/mswdo-id'
 
 export async function GET(request: NextRequest) {
   try {
@@ -138,21 +139,25 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        phone,
-        role,
-        barangayId: validatedBarangayId,
-        isActive: true
-      },
-      include: {
-        barangay: true
-      }
+    // Create user; barangay managers receive the next public ID number.
+    const user = await prisma.$transaction(async (tx) => {
+      const mswdoSequence = role === 'BARANGAY' ? await nextMswdoSequence(tx) : null
+      return tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          firstName,
+          lastName,
+          phone,
+          role,
+          barangayId: validatedBarangayId,
+          isActive: true,
+          mswdoSequence
+        },
+        include: {
+          barangay: true
+        }
+      })
     })
 
     // If user is BARANGAY role, update the barangay's managerId
