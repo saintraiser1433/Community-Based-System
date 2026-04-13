@@ -259,7 +259,8 @@ export default function BarangayManagement() {
         firstName: barangay.manager.firstName,
         lastName: barangay.manager.lastName,
         role: 'BARANGAY',
-        barangayName: barangay.name
+        barangayName: barangay.name,
+        idFilePath: barangay.manager.idFilePath ?? null
       })
       toast.success('Barangay manager ID card PDF downloaded')
     } catch (e) {

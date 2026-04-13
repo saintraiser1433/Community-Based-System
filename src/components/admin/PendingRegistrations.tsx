@@ -246,6 +246,7 @@ export default function PendingRegistrations() {
               lastName: approved.lastName,
               role: 'RESIDENT',
               barangayName: approved.barangay?.name ?? null,
+              idFilePath: approved.idFilePath ?? null,
               mswdoSequence: approved.mswdoSequence ?? null,
               isActive: true
             })

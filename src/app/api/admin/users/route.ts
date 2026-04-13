@@ -101,7 +101,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { email, password, firstName, lastName, phone, role, barangayId } = await request.json()
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      role,
+      barangayId,
+      idFilePath,
+      idBackFilePath
+    } = await request.json()
 
     console.log('Creating user with data:', { email, role, barangayId })
 
@@ -152,7 +162,9 @@ export async function POST(request: NextRequest) {
           role,
           barangayId: validatedBarangayId,
           isActive: true,
-          mswdoSequence
+          mswdoSequence,
+          idFilePath: idFilePath || null,
+          idBackFilePath: idBackFilePath || null
         },
         include: {
           barangay: true

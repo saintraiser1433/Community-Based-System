@@ -7,6 +7,8 @@ export interface IdCardData {
   lastName: string
   role: string
   barangayName?: string | null
+  /** Optional photo path (e.g. /uploads/ids/...) used on the ID card when available */
+  idFilePath?: string | null
   /** For RESIDENT: public ID (MSWDO-0001); shown on card when set */
   mswdoSequence?: number | null
   /** For RESIDENT only: must be true (approved / active) to generate an ID card */
@@ -45,6 +47,43 @@ async function loadGlanLogoDataUrl(): Promise<string | null> {
       reader.onerror = reject
       reader.readAsDataURL(blob)
     })
+  } catch {
+    return null
+  }
+}
+
+async function loadPhotoForPdf(
+  imagePath?: string | null
+): Promise<{ dataUrl: string; format: 'JPEG' | 'PNG' } | null> {
+  if (typeof window === 'undefined' || !imagePath) return null
+  try {
+    const url = new URL(imagePath, window.location.origin).href
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    if (!blob.type.startsWith('image/')) return null
+    const objectUrl = URL.createObjectURL(blob)
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image()
+        el.onload = () => resolve(el)
+        el.onerror = reject
+        el.src = objectUrl
+      })
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth || img.width
+      canvas.height = img.naturalHeight || img.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+      ctx.drawImage(img, 0, 0)
+      const isPng = blob.type === 'image/png'
+      return {
+        dataUrl: canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.92),
+        format: isPng ? 'PNG' : 'JPEG'
+      }
+    } finally {
+      URL.revokeObjectURL(objectUrl)
+    }
   } catch {
     return null
   }
@@ -117,11 +156,24 @@ export async function downloadUserIdCardPdf(data: IdCardData): Promise<void> {
   pdf.setDrawColor(203, 213, 225)
   pdf.setLineWidth(0.35)
   pdf.rect(3, bodyTop, photoW, photoH, 'S')
-  pdf.setTextColor(148, 163, 184)
-  pdf.setFontSize(7)
-  pdf.text('Photo', 3 + photoW / 2, bodyTop + photoH / 2 - 2, { align: 'center' })
-  pdf.setFontSize(6)
-  pdf.text('(blank)', 3 + photoW / 2, bodyTop + photoH / 2 + 2, { align: 'center' })
+  const userPhoto = await loadPhotoForPdf(data.idFilePath)
+  if (userPhoto) {
+    try {
+      pdf.addImage(userPhoto.dataUrl, userPhoto.format, 3.4, bodyTop + 0.4, photoW - 0.8, photoH - 0.8)
+    } catch {
+      pdf.setTextColor(148, 163, 184)
+      pdf.setFontSize(7)
+      pdf.text('Photo', 3 + photoW / 2, bodyTop + photoH / 2 - 2, { align: 'center' })
+      pdf.setFontSize(6)
+      pdf.text('(invalid)', 3 + photoW / 2, bodyTop + photoH / 2 + 2, { align: 'center' })
+    }
+  } else {
+    pdf.setTextColor(148, 163, 184)
+    pdf.setFontSize(7)
+    pdf.text('Photo', 3 + photoW / 2, bodyTop + photoH / 2 - 2, { align: 'center' })
+    pdf.setFontSize(6)
+    pdf.text('(blank)', 3 + photoW / 2, bodyTop + photoH / 2 + 2, { align: 'center' })
+  }
 
   let y = bodyTop + 5
 

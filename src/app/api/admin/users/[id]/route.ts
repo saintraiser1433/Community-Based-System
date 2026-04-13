@@ -73,7 +73,18 @@ export async function PUT(
     }
 
     const { id } = await params
-    const { email, password, firstName, lastName, phone, role, barangayId, isActive } = await request.json()
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      role,
+      barangayId,
+      isActive,
+      idFilePath,
+      idBackFilePath
+    } = await request.json()
 
     console.log('Updating user with data:', { email, role, barangayId })
 
@@ -155,7 +166,9 @@ export async function PUT(
         role,
         barangayId: validatedBarangayId,
         isActive,
-        mswdoSequence
+        mswdoSequence,
+        idFilePath: idFilePath || null,
+        idBackFilePath: idBackFilePath || null
       }
       if (passwordHash) {
         updateData.password = passwordHash

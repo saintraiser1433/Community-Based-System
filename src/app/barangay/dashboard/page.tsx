@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -76,6 +76,15 @@ export default function BarangayDashboard() {
   const [verifyConfirmField, setVerifyConfirmField] = useState<'indigent' | 'senior' | 'pwd' | null>(null)
   const [verifyConfirmAction, setVerifyConfirmAction] = useState<'APPROVE' | 'REJECT'>('APPROVE')
   const [verifyConfirmLoading, setVerifyConfirmLoading] = useState(false)
+  const [residentIdDocs, setResidentIdDocs] = useState({ idFilePath: '' })
+  const [residentIdUploading, setResidentIdUploading] = useState(false)
+  const [residentIdSaving, setResidentIdSaving] = useState(false)
+  const [showCameraDialog, setShowCameraDialog] = useState(false)
+  const [cameraTarget, setCameraTarget] = useState<'idFilePath' | null>(null)
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('')
+  const videoRef = useRef<HTMLVideoElement | null>(null)
   
   // Pagination states
   const [schedulesPage, setSchedulesPage] = useState(1)
@@ -394,7 +403,199 @@ export default function BarangayDashboard() {
 
   const openResidentDetails = (resident: any) => {
     setSelectedResident(resident)
+    setResidentIdDocs({
+      idFilePath: resident.idFilePath || ''
+    })
     setShowResidentDetails(true)
+  }
+
+  const uploadIdDocument = async (file: File) => {
+    const payload = new FormData()
+    payload.append('file', file)
+    payload.append('field', 'idFront')
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: payload
+    })
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to upload ID document')
+    }
+    return data.filePath as string
+  }
+
+  const handleResidentIdDocumentChange = async (target: 'idFilePath', file: File | null) => {
+    if (!file) return
+    setResidentIdUploading(true)
+    try {
+      const filePath = await uploadIdDocument(file)
+      setResidentIdDocs((prev) => ({ ...prev, [target]: filePath }))
+      toast.success('ID document uploaded')
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Failed to upload ID document')
+    } finally {
+      setResidentIdUploading(false)
+    }
+  }
+
+  const stopCamera = (closeDialog = true) => {
+    if (videoRef.current) {
+      videoRef.current.pause()
+      videoRef.current.srcObject = null
+    }
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop())
+    }
+    setCameraStream(null)
+    if (closeDialog) {
+      setShowCameraDialog(false)
+    }
+  }
+
+  const loadCameraDevices = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videos = devices.filter((d) => d.kind === 'videoinput')
+      setCameraDevices(videos)
+      if (!selectedCameraId && videos.length > 0) {
+        setSelectedCameraId(videos[0].deviceId)
+      }
+    } catch {
+      // Ignore device enumeration errors.
+    }
+  }
+
+  const startCameraCapture = async (target: 'idFilePath', deviceId?: string) => {
+    try {
+      stopCamera(false)
+      const preferredDeviceId = deviceId || selectedCameraId
+      const attempts: MediaStreamConstraints[] = preferredDeviceId
+        ? [
+            { video: { deviceId: { exact: preferredDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+            { video: { deviceId: { exact: preferredDeviceId } }, audio: false }
+          ]
+        : [
+            { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+            { video: { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+            { video: true, audio: false }
+          ]
+
+      let stream: MediaStream | null = null
+      for (const constraints of attempts) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints)
+          break
+        } catch {
+          // Try next fallback.
+        }
+      }
+      if (!stream) {
+        throw new Error('Unable to open camera stream')
+      }
+      setCameraTarget(target)
+      setCameraStream(stream)
+      setShowCameraDialog(true)
+      await loadCameraDevices()
+    } catch (error) {
+      console.error(error)
+      toast.error('Camera permission denied or camera unavailable')
+    }
+  }
+
+  const captureFromCamera = async () => {
+    if (!videoRef.current || !cameraTarget) return
+    const video = videoRef.current
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 1280
+    canvas.height = video.videoHeight || 720
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      toast.error('Unable to capture image from camera')
+      return
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.92)
+    )
+    if (!blob) {
+      toast.error('Failed to create image from camera capture')
+      return
+    }
+    const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' })
+    await handleResidentIdDocumentChange(cameraTarget, file)
+    stopCamera()
+  }
+
+  useEffect(() => {
+    if (!showCameraDialog || !videoRef.current || !cameraStream) return
+    const videoEl = videoRef.current
+    videoEl.setAttribute('playsinline', 'true')
+    videoEl.muted = true
+    videoEl.srcObject = cameraStream
+    videoEl.onloadedmetadata = () => {
+      videoEl.play().catch(() => {
+        toast.error('Unable to start camera preview')
+      })
+    }
+    if (videoEl.readyState >= 1) {
+      videoEl.play().catch(() => {
+        toast.error('Unable to start camera preview')
+      })
+    }
+    return () => {
+      videoEl.onloadedmetadata = null
+    }
+  }, [showCameraDialog, cameraStream])
+
+  useEffect(() => {
+    if (!showCameraDialog || !selectedCameraId || !cameraTarget || !cameraStream) return
+    startCameraCapture(cameraTarget, selectedCameraId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCameraId])
+
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop())
+      }
+    }
+  }, [cameraStream])
+
+  const saveResidentIdDocuments = async () => {
+    if (!selectedResident) return
+    setResidentIdSaving(true)
+    try {
+      const response = await fetch('/api/barangay/residents', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          residentId: selectedResident.id,
+          idFilePath: residentIdDocs.idFilePath || null
+        })
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to save resident ID documents')
+        return
+      }
+      toast.success('Resident ID documents updated')
+      await fetchDashboardData()
+      setSelectedResident((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              idFilePath: residentIdDocs.idFilePath || null
+            }
+          : prev
+      )
+    } catch (error) {
+      console.error(error)
+      toast.error('An error occurred while saving ID documents')
+    } finally {
+      setResidentIdSaving(false)
+    }
   }
 
   const openUnclaimedResidents = async (schedule: any) => {
@@ -1794,6 +1995,54 @@ export default function BarangayDashboard() {
                 </div>
               </div>
 
+              <div className="space-y-3 border rounded-lg p-4">
+                <Label className="text-sm font-medium text-gray-700">Resident Image (Camera Only)</Label>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-28 w-28 overflow-hidden rounded-full border bg-muted">
+                    {residentIdDocs.idFilePath ? (
+                      <img
+                        src={residentIdDocs.idFilePath}
+                        alt={`${selectedResident?.firstName ?? 'Resident'} avatar`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                        No Image
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={residentIdUploading || residentIdSaving}
+                      onClick={() => startCameraCapture('idFilePath')}
+                    >
+                      Open Camera (Permission Required)
+                    </Button>
+                    {residentIdDocs.idFilePath && (
+                      <a
+                        href={residentIdDocs.idFilePath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-700 underline break-all"
+                      >
+                        View saved resident image
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={saveResidentIdDocuments}
+                    disabled={residentIdUploading || residentIdSaving}
+                  >
+                    {residentIdSaving ? 'Saving...' : 'Save ID Documents'}
+                  </Button>
+                </div>
+              </div>
+
               {selectedResident.families && selectedResident.families.length > 0 ? (
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Family Information</Label>
@@ -2399,6 +2648,49 @@ export default function BarangayDashboard() {
                 {loading ? 'Updating...' : 'Update Classification'}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showCameraDialog}
+        onOpenChange={(open) => {
+          if (!open) stopCamera()
+          else setShowCameraDialog(open)
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Capture ID Image</DialogTitle>
+            <DialogDescription>
+              Allow camera permission, then capture a clear photo.
+            </DialogDescription>
+          </DialogHeader>
+          {cameraDevices.length > 0 && (
+            <div className="space-y-1">
+              <Label>Camera Device</Label>
+              <Select value={selectedCameraId} onValueChange={setSelectedCameraId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select camera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cameraDevices.map((device, index) => (
+                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Camera ${index + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <video ref={videoRef} className="w-full aspect-video min-h-[240px] rounded-md bg-black object-cover" autoPlay playsInline muted />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={stopCamera}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={captureFromCamera}>
+              Capture Photo
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
