@@ -183,8 +183,13 @@ export async function PUT(
       })
     })
 
-    // Handle barangay manager assignment
-    if (role === 'BARANGAY' && validatedBarangayId) {
+    // Handle barangay manager assignment only when assignment changes.
+    const isChangingManagerAssignment =
+      role === 'BARANGAY' &&
+      !!validatedBarangayId &&
+      (existingUser.role !== 'BARANGAY' || existingUser.barangayId !== validatedBarangayId)
+
+    if (isChangingManagerAssignment && validatedBarangayId) {
       await prisma.$transaction(async (tx) => {
         // Ensure one user manages at most one barangay by clearing any previous assignment first.
         await tx.barangay.updateMany({
@@ -214,7 +219,7 @@ export async function PUT(
           data: { managerId: user.id }
         })
       })
-    } else if (existingUser.role === 'BARANGAY') {
+    } else if (existingUser.role === 'BARANGAY' && role !== 'BARANGAY') {
       // If user is no longer a barangay manager, remove any barangay they currently manage.
       await prisma.barangay.updateMany({
         where: { managerId: user.id },
