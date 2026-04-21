@@ -32,6 +32,13 @@ export async function GET(request: NextRequest) {
         role: 'RESIDENT'
       },
       include: {
+        barangay: {
+          select: {
+            id: true,
+            name: true,
+            code: true
+          }
+        },
         families: {
           include: {
             members: true

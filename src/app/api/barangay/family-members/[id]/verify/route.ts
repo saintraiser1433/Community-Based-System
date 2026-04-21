@@ -49,7 +49,9 @@ export async function PUT(
       include: { managedBarangay: true }
     })
 
-    if (!manager?.managedBarangay?.id) {
+    const managerBarangayId = manager?.managedBarangay?.id || manager?.barangayId || null
+
+    if (!managerBarangayId) {
       return NextResponse.json(
         { error: 'Barangay manager not linked to a barangay' },
         { status: 400 }
@@ -59,9 +61,20 @@ export async function PUT(
     const member = await prisma.familyMember.findFirst({
       where: {
         id,
-        family: {
-          barangayId: manager.managedBarangay.id
-        }
+        OR: [
+          {
+            family: {
+              barangayId: managerBarangayId
+            }
+          },
+          {
+            family: {
+              head: {
+                barangayId: managerBarangayId
+              }
+            }
+          }
+        ]
       },
       include: {
         family: {

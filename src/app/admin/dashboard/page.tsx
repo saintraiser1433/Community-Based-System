@@ -68,7 +68,7 @@ export default function AdminDashboard() {
     endDate: ''
   })
   const [allBarangays, setAllBarangays] = useState<any[]>([])
-  
+
   // User management state
   const [users, setUsers] = useState([])
   const [usersLoading, setUsersLoading] = useState(false)
@@ -599,6 +599,7 @@ export default function AdminDashboard() {
           <TabsContent value="sms" className="space-y-6">
             <SMSSettings />
           </TabsContent>
+
         </Tabs>
 
         {/* Report Filters Dialog */}
@@ -692,6 +693,7 @@ export default function AdminDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
       </div>
     </div>
   )

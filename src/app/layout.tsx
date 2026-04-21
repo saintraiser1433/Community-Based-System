@@ -28,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full overflow-x-hidden`}
       >
         <AuthSessionProvider>

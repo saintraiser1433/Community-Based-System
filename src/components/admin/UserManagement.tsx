@@ -50,8 +50,16 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   /** Staff = admin + barangay managers; residents = separate list with barangay filter */
-  const [listModule, setListModule] = useState<'staff' | 'residents'>('staff')
+  const [listModule, setListModule] = useState<'staff' | 'residents' | 'residentInsights'>('staff')
   const [barangayFilter, setBarangayFilter] = useState<string>('all')
+  const [residentInsightsSearchTerm, setResidentInsightsSearchTerm] = useState('')
+  const [familyCategory, setFamilyCategory] = useState<'ALL' | 'PWD' | 'STUDENT' | 'INDIGENT' | 'SENIOR' | 'OTHER'>('PWD')
+  const [familyStatsRows, setFamilyStatsRows] = useState<any[]>([])
+  const [familyStatsLoading, setFamilyStatsLoading] = useState(false)
+  const [showFamilyDetails, setShowFamilyDetails] = useState(false)
+  const [selectedBarangayForFamilies, setSelectedBarangayForFamilies] = useState<any | null>(null)
+  const [familyDetailsLoading, setFamilyDetailsLoading] = useState(false)
+  const [familyDetails, setFamilyDetails] = useState<any[]>([])
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -90,12 +98,129 @@ export default function UserManagement() {
   }, [])
 
   useEffect(() => {
+    if (listModule === 'residentInsights') return
     const timeoutId = setTimeout(() => {
       setCurrentPage(1)
       fetchUsers(1)
     }, 400)
     return () => clearTimeout(timeoutId)
   }, [searchTerm, listModule, barangayFilter])
+
+  useEffect(() => {
+    if (listModule !== 'residentInsights') return
+    fetchFamilyStats(familyCategory)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listModule, familyCategory])
+
+  const fetchFamilyStats = async (
+    category: 'ALL' | 'PWD' | 'STUDENT' | 'INDIGENT' | 'SENIOR' | 'OTHER'
+  ) => {
+    setFamilyStatsLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (category && category !== 'ALL') params.append('category', category)
+      const res = await fetch(`/api/admin/family-stats?${params.toString()}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      setFamilyStatsRows(data.rows || [])
+    } catch (error) {
+      console.error('Error fetching family stats:', error)
+    } finally {
+      setFamilyStatsLoading(false)
+    }
+  }
+
+  const getCategoryLabel = (c: typeof familyCategory) => {
+    if (c === 'PWD') return 'PWD'
+    if (c === 'STUDENT') return 'Students'
+    if (c === 'INDIGENT') return 'Indigent'
+    if (c === 'SENIOR') return 'Senior Citizens'
+    if (c === 'OTHER') return 'Other'
+    return 'All'
+  }
+
+  const getCategoryListLabel = (c: typeof familyCategory) => {
+    if (c === 'PWD') return 'PWD List'
+    if (c === 'STUDENT') return 'Students List'
+    if (c === 'INDIGENT') return 'Indigent List'
+    if (c === 'SENIOR') return 'Senior Citizens List'
+    if (c === 'OTHER') return 'Other Members List'
+    return 'Members List'
+  }
+
+  const getFamilyMatchesCount = (row: any) => {
+    if (familyCategory === 'PWD') return row.pwdFamilies || 0
+    if (familyCategory === 'STUDENT') return row.studentFamilies || 0
+    if (familyCategory === 'INDIGENT') return row.indigentFamilies || 0
+    if (familyCategory === 'SENIOR') return row.seniorFamilies || 0
+    if (familyCategory === 'OTHER') return row.otherFamilies || 0
+    return row.totalFamilies || 0
+  }
+
+  const openFamilyDetails = async (barangay: any) => {
+    setSelectedBarangayForFamilies(barangay)
+    setFamilyDetails([])
+    setFamilyDetailsLoading(true)
+    setShowFamilyDetails(true)
+
+    try {
+      const params = new URLSearchParams()
+      params.append('barangayId', barangay.id)
+      if (familyCategory && familyCategory !== 'ALL') params.append('category', familyCategory)
+      const res = await fetch(`/api/admin/families?${params.toString()}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      setFamilyDetails(data.families || [])
+    } catch (error) {
+      console.error('Error fetching family details:', error)
+    } finally {
+      setFamilyDetailsLoading(false)
+    }
+  }
+
+  const filteredFamilyStatsRows = familyStatsRows.filter((row: any) => {
+    if (!residentInsightsSearchTerm.trim()) return true
+    const q = residentInsightsSearchTerm.toLowerCase()
+    return (
+      String(row.name || '').toLowerCase().includes(q) ||
+      String(row.code || '').toLowerCase().includes(q)
+    )
+  })
+
+  const residentInsightsTotals = filteredFamilyStatsRows.reduce(
+    (acc: any, row: any) => {
+      acc.totalFamilies += row.totalFamilies || 0
+      acc.pwdFamilies += row.pwdFamilies || 0
+      acc.studentFamilies += row.studentFamilies || 0
+      acc.studentElementaryCount += row.studentElementaryCount || 0
+      acc.studentHighSchoolCount += row.studentHighSchoolCount || 0
+      acc.studentSeniorHighSchoolCount += row.studentSeniorHighSchoolCount || 0
+      acc.studentCollegeCount += row.studentCollegeCount || 0
+      acc.notStudentCount += row.notStudentCount || 0
+      acc.indigentFamilies += row.indigentFamilies || 0
+      acc.seniorFamilies += row.seniorFamilies || 0
+      acc.otherFamilies += row.otherFamilies || 0
+      return acc
+    },
+    {
+      totalFamilies: 0,
+      pwdFamilies: 0,
+      studentFamilies: 0,
+      studentElementaryCount: 0,
+      studentHighSchoolCount: 0,
+      studentSeniorHighSchoolCount: 0,
+      studentCollegeCount: 0,
+      notStudentCount: 0,
+      indigentFamilies: 0,
+      seniorFamilies: 0,
+      otherFamilies: 0
+    }
+  )
+
+  const topBarangayBySelectedType = filteredFamilyStatsRows.reduce((best: any, row: any) => {
+    if (!best) return row
+    return getFamilyMatchesCount(row) > getFamilyMatchesCount(best) ? row : best
+  }, null)
 
   const fetchUsers = async (page = currentPage) => {
     setIsLoading(true)
@@ -606,14 +731,15 @@ export default function UserManagement() {
           <Tabs
             value={listModule}
             onValueChange={(v) => {
-              setListModule(v as 'staff' | 'residents')
+              setListModule(v as 'staff' | 'residents' | 'residentInsights')
               setCurrentPage(1)
             }}
             className="w-full"
           >
-            <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+            <TabsList className="grid w-full max-w-2xl grid-cols-3 mb-4">
               <TabsTrigger value="staff">Staff (Admin & Barangay)</TabsTrigger>
               <TabsTrigger value="residents">Residents</TabsTrigger>
+              <TabsTrigger value="residentInsights">Resident Insights</TabsTrigger>
             </TabsList>
             <TabsContent value="staff" className="mt-0 space-y-4">
               <p className="text-sm text-muted-foreground">
@@ -625,72 +751,290 @@ export default function UserManagement() {
                 Registered residents. Approve new registrations under Pending Registrations. Filter by barangay below.
               </p>
             </TabsContent>
+            <TabsContent value="residentInsights" className="mt-0 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Family-based resident insights by barangay (PWD, Students, and other categories).
+              </p>
+            </TabsContent>
           </Tabs>
 
           {/* Filters */}
-          <div className="flex flex-col lg:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
-                <Input
-                  placeholder="Search by name or email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            {listModule === 'residents' && (
-              <div className="w-full lg:w-64">
-                <Label className="sr-only">Barangay</Label>
-                <Select
-                  value={barangayFilter}
-                  onValueChange={(v) => {
-                    setBarangayFilter(v)
-                    setCurrentPage(1)
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All barangays" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All barangays</SelectItem>
-                    {barangays.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name} ({b.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="flex flex-col xl:flex-row gap-3 sm:gap-4 mb-6">
+            {listModule !== 'residentInsights' ? (
+              <>
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
+                    <Input
+                      placeholder="Search by name or email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                {listModule === 'residents' && (
+                  <div className="w-full lg:w-64">
+                    <Label className="sr-only">Barangay</Label>
+                    <Select
+                      value={barangayFilter}
+                      onValueChange={(v) => {
+                        setBarangayFilter(v)
+                        setCurrentPage(1)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="All barangays" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All barangays</SelectItem>
+                        {barangays.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name} ({b.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-gray-700">SEARCH :</Label>
+                    <div className="relative">
+                      <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
+                      <Input
+                        placeholder="Search barangay name or code..."
+                        value={residentInsightsSearchTerm}
+                        onChange={(e) => setResidentInsightsSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="w-full xl:w-80">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-gray-700">TYPE :</Label>
+                    <Select value={familyCategory} onValueChange={(v: any) => setFamilyCategory(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PWD">PWD</SelectItem>
+                        <SelectItem value="STUDENT">Students</SelectItem>
+                        <SelectItem value="SENIOR">Senior Citizens</SelectItem>
+                        <SelectItem value="INDIGENT">Indigent</SelectItem>
+                        <SelectItem value="OTHER">Other (none of the above)</SelectItem>
+                        <SelectItem value="ALL">All Families</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </>
             )}
-            <Button type="button" variant="secondary" onClick={() => fetchUsers(1)}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => (listModule === 'residentInsights' ? fetchFamilyStats(familyCategory) : fetchUsers(1))}
+            >
               Refresh
             </Button>
           </div>
 
-          {/* Users Table */}
-          {isLoading ? (
+          {/* Users Table / Resident Insights Table */}
+          {listModule === 'residentInsights' ? (
+            <div className="space-y-4 sm:space-y-5">
+              <div className="text-sm text-gray-600 leading-relaxed">
+                Showing <span className="font-medium">{getCategoryLabel(familyCategory)}</span> family counts per barangay
+              </div>
+
+              {/* Resident Insights Analytics */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Covered Barangays</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{filteredFamilyStatsRows.length}</div>
+                    <p className="text-xs text-muted-foreground">Barangays in current result set</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Total Families</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{residentInsightsTotals.totalFamilies}</div>
+                    <p className="text-xs text-muted-foreground">Across filtered barangays</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">{getCategoryLabel(familyCategory)} Families</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {familyCategory === 'ALL'
+                        ? residentInsightsTotals.totalFamilies
+                        : residentInsightsTotals[
+                            familyCategory === 'PWD'
+                              ? 'pwdFamilies'
+                              : familyCategory === 'STUDENT'
+                              ? 'studentFamilies'
+                              : familyCategory === 'INDIGENT'
+                              ? 'indigentFamilies'
+                              : familyCategory === 'SENIOR'
+                              ? 'seniorFamilies'
+                              : 'otherFamilies'
+                          ]}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Current selected type total</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Top Barangay ({getCategoryLabel(familyCategory)})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-base font-semibold truncate">
+                      {topBarangayBySelectedType?.name || 'N/A'}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Count: {topBarangayBySelectedType ? getFamilyMatchesCount(topBarangayBySelectedType) : 0}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {familyCategory === 'ALL' && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">PWD</p><p className="text-lg font-bold">{residentInsightsTotals.pwdFamilies}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Students</p><p className="text-lg font-bold">{residentInsightsTotals.studentFamilies}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Indigent</p><p className="text-lg font-bold">{residentInsightsTotals.indigentFamilies}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Senior</p><p className="text-lg font-bold">{residentInsightsTotals.seniorFamilies}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Other</p><p className="text-lg font-bold">{residentInsightsTotals.otherFamilies}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Total Families</p><p className="text-lg font-bold">{residentInsightsTotals.totalFamilies}</p></CardContent></Card>
+                </div>
+              )}
+
+              {familyCategory === 'STUDENT' && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2 sm:gap-3">
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Elementary</p><p className="text-lg font-bold">{residentInsightsTotals.studentElementaryCount}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">High School</p><p className="text-lg font-bold">{residentInsightsTotals.studentHighSchoolCount}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Senior High School</p><p className="text-lg font-bold">{residentInsightsTotals.studentSeniorHighSchoolCount}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">College</p><p className="text-lg font-bold">{residentInsightsTotals.studentCollegeCount}</p></CardContent></Card>
+                  <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Not Student</p><p className="text-lg font-bold">{residentInsightsTotals.notStudentCount}</p></CardContent></Card>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Barangay</TableHead>
+                      <TableHead className="text-right">Total Families</TableHead>
+                      {familyCategory === 'ALL' ? (
+                        <>
+                          <TableHead className="text-right">PWD</TableHead>
+                          <TableHead className="text-right">Students</TableHead>
+                          <TableHead className="text-right">Indigent</TableHead>
+                          <TableHead className="text-right">Senior</TableHead>
+                          <TableHead className="text-right">Other</TableHead>
+                        </>
+                      ) : familyCategory === 'STUDENT' ? (
+                        <>
+                          <TableHead className="text-right">Elementary</TableHead>
+                          <TableHead className="text-right">High School</TableHead>
+                          <TableHead className="text-right">Senior High</TableHead>
+                          <TableHead className="text-right">College</TableHead>
+                          <TableHead className="text-right">Not Student</TableHead>
+                        </>
+                      ) : (
+                        <TableHead className="text-right">{getCategoryLabel(familyCategory)} Families</TableHead>
+                      )}
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {familyStatsLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={familyCategory === 'ALL' || familyCategory === 'STUDENT' ? 8 : 4} className="text-center py-8 text-gray-600">Loading...</TableCell>
+                      </TableRow>
+                    ) : filteredFamilyStatsRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={familyCategory === 'ALL' || familyCategory === 'STUDENT' ? 8 : 4} className="text-center py-8 text-gray-600">No matching barangays found.</TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredFamilyStatsRows.map((row: any) => (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            <div className="font-medium">{row.name}</div>
+                            <div className="text-xs text-gray-500">{row.code}</div>
+                          </TableCell>
+                          <TableCell className="text-right">{row.totalFamilies || 0}</TableCell>
+                          {familyCategory === 'ALL' ? (
+                            <>
+                              <TableCell className="text-right font-semibold">{row.pwdFamilies || 0}</TableCell>
+                              <TableCell className="text-right font-semibold">{row.studentFamilies || 0}</TableCell>
+                              <TableCell className="text-right font-semibold">{row.indigentFamilies || 0}</TableCell>
+                              <TableCell className="text-right font-semibold">{row.seniorFamilies || 0}</TableCell>
+                              <TableCell className="text-right font-semibold">{row.otherFamilies || 0}</TableCell>
+                            </>
+                          ) : familyCategory === 'STUDENT' ? (
+                            <>
+                              <TableCell className="text-right font-semibold">{row.studentElementaryCount || 0}</TableCell>
+                              <TableCell className="text-right font-semibold">{row.studentHighSchoolCount || 0}</TableCell>
+                              <TableCell className="text-right font-semibold">{row.studentSeniorHighSchoolCount || 0}</TableCell>
+                              <TableCell className="text-right font-semibold">{row.studentCollegeCount || 0}</TableCell>
+                              <TableCell className="text-right font-semibold">{row.notStudentCount || 0}</TableCell>
+                            </>
+                          ) : (
+                            <TableCell className="text-right font-semibold">{getFamilyMatchesCount(row)}</TableCell>
+                          )}
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={getFamilyMatchesCount(row) === 0}
+                              onClick={() => openFamilyDetails(row)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View details
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="text-center py-8">Loading users...</div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Image</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>ID No.</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Barangay</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>ID Card</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>ID No.</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Barangay</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>ID Card</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
                     <TableCell>
                       {user.idFilePath ? (
                         <img
@@ -761,21 +1105,23 @@ export default function UserManagement() {
                         </Button>
                       </div>
                     </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
 
           {/* Pagination */}
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={fetchUsers}
-            totalItems={totalItems}
-            itemsPerPage={itemsPerPage}
-          />
+          {listModule !== 'residentInsights' && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={fetchUsers}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+            />
+          )}
 
           {/* Edit User Dialog */}
           <Dialog open={showEditUser} onOpenChange={(open) => {
@@ -1000,6 +1346,68 @@ export default function UserManagement() {
               Capture Photo
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFamilyDetails} onOpenChange={setShowFamilyDetails}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedBarangayForFamilies?.name || 'Barangay'} - {getCategoryLabel(familyCategory)} Families
+            </DialogTitle>
+            <DialogDescription>
+              Families matching the selected category.
+            </DialogDescription>
+          </DialogHeader>
+          {familyDetailsLoading ? (
+            <div className="py-8 text-center text-gray-600">Loading families...</div>
+          ) : familyDetails.length === 0 ? (
+            <div className="py-8 text-center text-gray-600">No matching families found.</div>
+          ) : (
+            <div className="space-y-3 sm:space-y-4 max-h-[60vh] overflow-auto pr-1 sm:pr-2">
+              {familyDetails.map((fam: any) => {
+                const matchingMembers = (fam.members || []).filter((m: any) => {
+                  if (familyCategory === 'PWD') return !!m.isPWD
+                  if (familyCategory === 'STUDENT') return !!m.isStudent
+                  if (familyCategory === 'INDIGENT') return !!m.isIndigent
+                  if (familyCategory === 'SENIOR') return !!m.isSeniorCitizen
+                  if (familyCategory === 'OTHER') {
+                    return !(m.isPWD || m.isStudent || m.isIndigent || m.isSeniorCitizen)
+                  }
+                  return true
+                })
+
+                return (
+                  <div key={fam.id} className="border rounded-lg p-3 sm:p-4 space-y-2">
+                    <div className="text-sm sm:text-base">
+                      <span className="font-semibold">Head name:</span>{' '}
+                      <span>{fam.head?.firstName} {fam.head?.lastName}</span>
+                    </div>
+                    <div className="text-sm text-gray-700 leading-relaxed">
+                      <span className="font-semibold">Address:</span>{' '}
+                      <span>{fam.address || 'N/A'}</span>
+                    </div>
+                    <div className="pt-1">
+                      <div className="text-sm font-semibold text-gray-800 mb-1">
+                        {getCategoryListLabel(familyCategory)}:
+                      </div>
+                      {matchingMembers.length === 0 ? (
+                        <span className="text-xs text-gray-500">No matching members in this family.</span>
+                      ) : (
+                        <ol className="list-decimal pl-5 space-y-1">
+                          {matchingMembers.map((m: any) => (
+                            <li key={m.id} className="text-sm text-gray-800">
+                              {m.name}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

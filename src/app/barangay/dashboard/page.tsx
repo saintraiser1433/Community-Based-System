@@ -73,7 +73,7 @@ export default function BarangayDashboard() {
   const [loading, setLoading] = useState(false)
   const [verifyConfirmOpen, setVerifyConfirmOpen] = useState(false)
   const [verifyConfirmMember, setVerifyConfirmMember] = useState<{ id: string; name: string } | null>(null)
-  const [verifyConfirmField, setVerifyConfirmField] = useState<'indigent' | 'senior' | 'pwd' | null>(null)
+  const [verifyConfirmField, setVerifyConfirmField] = useState<'indigent' | 'senior' | 'pwd' | 'student' | null>(null)
   const [verifyConfirmAction, setVerifyConfirmAction] = useState<'APPROVE' | 'REJECT'>('APPROVE')
   const [verifyConfirmLoading, setVerifyConfirmLoading] = useState(false)
   const [residentIdDocs, setResidentIdDocs] = useState({ idFilePath: '' })
@@ -628,7 +628,7 @@ export default function BarangayDashboard() {
 
   const openVerifyConfirm = (
     member: any,
-    field: 'indigent' | 'senior' | 'pwd',
+    field: 'indigent' | 'senior' | 'pwd' | 'student',
     action: 'APPROVE' | 'REJECT' = 'APPROVE'
   ) => {
     setVerifyConfirmMember({ id: member.id, name: member.name })
@@ -638,7 +638,7 @@ export default function BarangayDashboard() {
   }
 
   const handleVerifyConfirm = async () => {
-    if (!verifyConfirmMember || !verifyConfirmField || !selectedResident) return
+    if (!verifyConfirmMember || !verifyConfirmField) return
     setVerifyConfirmLoading(true)
     try {
       const response = await fetch(
@@ -659,6 +659,8 @@ export default function BarangayDashboard() {
           ? 'Indigent'
           : verifyConfirmField === 'senior'
           ? 'Senior Citizen'
+          : verifyConfirmField === 'student'
+          ? 'Student'
           : 'PWD'
       const actionLabel = verifyConfirmAction === 'APPROVE' ? 'approved' : 'rejected'
       toast.success(`${fieldLabel} status ${actionLabel}`)
@@ -667,8 +669,10 @@ export default function BarangayDashboard() {
         const list = await residentsRes.json()
         setResidents(list)
         setClassifiedResidents(list)
-        const updated = list.find((r: any) => r.id === selectedResident.id)
-        if (updated) setSelectedResident(updated)
+        if (selectedResident?.id) {
+          const updated = list.find((r: any) => r.id === selectedResident.id)
+          if (updated) setSelectedResident(updated)
+        }
       }
       setVerifyConfirmOpen(false)
       setVerifyConfirmMember(null)
@@ -772,6 +776,33 @@ export default function BarangayDashboard() {
     return Math.ceil(data.length / itemsPerPage)
   }
 
+  const pendingFamilyApprovalsCount = residents.reduce((total: number, resident: any) => {
+    const residentPending = (resident.families || []).reduce((familyTotal: number, family: any) => {
+      const memberPending = (family.members || []).filter(
+        (member: any) =>
+          member.indigentVerificationStatus === 'PENDING' ||
+          member.seniorVerificationStatus === 'PENDING' ||
+          member.pwdVerificationStatus === 'PENDING' ||
+          member.studentVerificationStatus === 'PENDING'
+      ).length
+      return familyTotal + memberPending
+    }, 0)
+    return total + residentPending
+  }, 0)
+
+  const getResidentPendingApprovalsCount = (resident: any) => {
+    return (resident.families || []).reduce((familyTotal: number, family: any) => {
+      const memberPending = (family.members || []).filter(
+        (member: any) =>
+          member.indigentVerificationStatus === 'PENDING' ||
+          member.seniorVerificationStatus === 'PENDING' ||
+          member.pwdVerificationStatus === 'PENDING' ||
+          member.studentVerificationStatus === 'PENDING'
+      ).length
+      return familyTotal + memberPending
+    }, 0)
+  }
+
   const openEditSchedule = (schedule: any) => {
     setSelectedSchedule(schedule)
     setNewSchedule({
@@ -855,6 +886,11 @@ export default function BarangayDashboard() {
             <TabsTrigger value="residents" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Users className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Residents</span>
+              {pendingFamilyApprovalsCount > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-[10px]">
+                  {pendingFamilyApprovalsCount}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="classification" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Tag className="h-4 w-4" />
@@ -867,7 +903,7 @@ export default function BarangayDashboard() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 sm:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Schedules</CardTitle>
@@ -920,6 +956,19 @@ export default function BarangayDashboard() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Future distributions
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pending Family Approvals</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{pendingFamilyApprovalsCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Verification requests to review
                   </p>
                 </CardContent>
               </Card>
@@ -1608,12 +1657,26 @@ export default function BarangayDashboard() {
                           <h3 className="font-semibold">{resident.firstName} {resident.lastName}</h3>
                           <p className="text-sm text-gray-600">{resident.email}</p>
                           <p className="text-sm text-gray-500">{resident.phone}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Barangay: {resident.barangay?.name || 'N/A'}
+                          </p>
+                          {getResidentPendingApprovalsCount(resident) > 0 && (
+                            <p className="text-xs text-red-600 mt-1">
+                              {getResidentPendingApprovalsCount(resident)} pending family approval
+                              {getResidentPendingApprovalsCount(resident) > 1 ? 's' : ''}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Badge variant={resident.isActive ? 'default' : 'secondary'}>
                           {resident.isActive ? 'Active' : 'Inactive'}
                         </Badge>
+                        {getResidentPendingApprovalsCount(resident) > 0 && (
+                          <Badge variant="destructive">
+                            Pending: {getResidentPendingApprovalsCount(resident)}
+                          </Badge>
+                        )}
                         <Button 
                           variant="outline" 
                           size="sm"
@@ -1975,6 +2038,16 @@ export default function BarangayDashboard() {
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Phone</Label>
                   <p className="text-sm">{selectedResident.phone || 'Not provided'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Barangay</Label>
+                  <p className="text-sm">
+                    {selectedResident.barangay?.name || 'Not assigned'}
+                    {selectedResident.barangay?.code ? ` (${selectedResident.barangay.code})` : ''}
+                  </p>
                 </div>
               </div>
 
@@ -2430,6 +2503,8 @@ export default function BarangayDashboard() {
                   ? 'Indigent'
                   : verifyConfirmField === 'senior'
                   ? 'Senior Citizen'
+                  : verifyConfirmField === 'student'
+                  ? 'Student'
                   : 'PWD'
               } Status?`
             : 'Confirm action'
@@ -2443,6 +2518,8 @@ export default function BarangayDashboard() {
                   ? 'Indigent'
                   : verifyConfirmField === 'senior'
                   ? 'Senior Citizen'
+                  : verifyConfirmField === 'student'
+                  ? 'Student'
                   : 'PWD'
               } status for ${verifyConfirmMember.name}?`
             : ''

@@ -444,6 +444,15 @@ export default function ResidentDashboard() {
     return Math.ceil(data.length / itemsPerPage)
   }
 
+  const residentBarangayName = (session?.user as any)?.barangay?.name || 'Not assigned'
+
+  const pendingApprovalsCount = familyMembers.filter((member: any) =>
+    member.indigentVerificationStatus === 'PENDING' ||
+    member.seniorVerificationStatus === 'PENDING' ||
+    member.pwdVerificationStatus === 'PENDING' ||
+    member.studentVerificationStatus === 'PENDING'
+  ).length
+
   if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -492,6 +501,9 @@ export default function ResidentDashboard() {
           <p className="text-sm sm:text-base text-gray-600">
             Manage your family and view donation schedules
           </p>
+          <p className="text-sm text-gray-500 mt-1">
+            Barangay: <span className="font-medium text-gray-700">{residentBarangayName}</span>
+          </p>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
@@ -507,6 +519,11 @@ export default function ResidentDashboard() {
             <TabsTrigger value="family" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Users className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Family</span>
+              {pendingApprovalsCount > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-[10px]">
+                  {pendingApprovalsCount}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="claims" className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 py-2 sm:py-1">
               <Package className="h-4 w-4" />
@@ -515,7 +532,20 @@ export default function ResidentDashboard() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Barangay</CardTitle>
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold">{residentBarangayName}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Your registered barangay
+                  </p>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Family Members</CardTitle>
@@ -555,6 +585,19 @@ export default function ResidentDashboard() {
                   <div className="text-2xl font-bold">{claims.length}</div>
                   <p className="text-xs text-muted-foreground">
                     Donations received
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
+                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{pendingApprovalsCount}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Family requests awaiting barangay approval
                   </p>
                 </CardContent>
               </Card>
