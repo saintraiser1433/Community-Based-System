@@ -10,13 +10,36 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar } from '@/components/ui/calendar'
-import { Eye, EyeOff, ArrowLeft, UserPlus, CalendarIcon, Upload, FileText } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, UserPlus } from 'lucide-react'
 import Image from 'next/image'
-import { format } from 'date-fns'
 
 export default function SignUpPage() {
+  const formatDateForInput = (date: Date | null) => {
+    if (!date) return ''
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const parseDateFromInput = (value: string) => {
+    if (!value) return null
+    const [yearStr, monthStr, dayStr] = value.split('-')
+    const year = Number(yearStr)
+    const month = Number(monthStr)
+    const day = Number(dayStr)
+    if (!year || !month || !day) return null
+    return new Date(year, month - 1, day)
+  }
+
+  const todayForDateInput = (() => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  })()
+
   const [formData, setFormData] = useState({
     // Personal Information
     firstName: '',
@@ -335,7 +358,7 @@ export default function SignUpPage() {
           <p className="text-gray-600">Complete the form below to register in the Community-Based Donation System</p>
         </div>
 
-        <Card>
+        <Card className="border-0 shadow-xl shadow-slate-200/60">
           <CardHeader>
             <CardTitle>Resident Registration</CardTitle>
             <CardDescription>
@@ -351,17 +374,17 @@ export default function SignUpPage() {
               )}
 
               <Tabs defaultValue="personal" className="w-full">
-                <TabsList className="grid w-full grid-cols-6">
-                  <TabsTrigger value="personal">Personal</TabsTrigger>
-                  <TabsTrigger value="residency">Residency</TabsTrigger>
-                  <TabsTrigger value="education">Education</TabsTrigger>
-                  <TabsTrigger value="household">Household</TabsTrigger>
-                  <TabsTrigger value="occupation">Occupation</TabsTrigger>
-                  <TabsTrigger value="documents">Documents</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-6 rounded-xl bg-slate-100 p-1">
+                  <TabsTrigger value="personal" className="rounded-lg">Personal</TabsTrigger>
+                  <TabsTrigger value="residency" className="rounded-lg">Residency</TabsTrigger>
+                  <TabsTrigger value="education" className="rounded-lg">Education</TabsTrigger>
+                  <TabsTrigger value="household" className="rounded-lg">Household</TabsTrigger>
+                  <TabsTrigger value="occupation" className="rounded-lg">Occupation</TabsTrigger>
+                  <TabsTrigger value="documents" className="rounded-lg">Documents</TabsTrigger>
                 </TabsList>
 
                 {/* Personal Information Tab */}
-                <TabsContent value="personal" className="space-y-4 mt-4">
+                <TabsContent value="personal" className="mt-4 space-y-4 rounded-xl border bg-white p-5 shadow-sm">
                   <div className="space-y-2">
                     <h3 className="text-lg font-semibold">A. Personal Information</h3>
                   </div>
@@ -395,7 +418,7 @@ export default function SignUpPage() {
                     <div className="space-y-2">
                       <Label htmlFor="gender">Sex / Gender *</Label>
                       <Select value={formData.gender} onValueChange={(value) => handleSelectChange('gender', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select gender" />
                         </SelectTrigger>
                         <SelectContent>
@@ -407,26 +430,21 @@ export default function SignUpPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="dateOfBirth">Date of Birth *</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-left font-normal"
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {formData.dateOfBirth ? format(formData.dateOfBirth, 'PPP') : 'Select date'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={formData.dateOfBirth || undefined}
-                            onSelect={(date) => setFormData({ ...formData, dateOfBirth: date || null })}
-                            initialFocus
-                            disabled={(date) => date > new Date()}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <Input
+                        id="dateOfBirth"
+                        name="dateOfBirth"
+                        type="date"
+                        value={formatDateForInput(formData.dateOfBirth)}
+                        max={todayForDateInput}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            dateOfBirth: parseDateFromInput(e.target.value)
+                          })
+                        }
+                        required
+                      />
+                      <p className="text-xs text-gray-500">You can type the date or use the date picker.</p>
                     </div>
                   </div>
 
@@ -442,7 +460,7 @@ export default function SignUpPage() {
                         required
                       />
                       <Select value={formData.barangayId} onValueChange={(value) => handleSelectChange('barangayId', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder={isLoadingBarangays ? "Loading..." : "Select Barangay"} />
                         </SelectTrigger>
                         <SelectContent>
@@ -542,7 +560,7 @@ export default function SignUpPage() {
                 </TabsContent>
 
                 {/* Residency Category Tab */}
-                <TabsContent value="residency" className="space-y-4 mt-4">
+                <TabsContent value="residency" className="mt-4 space-y-4 rounded-xl border bg-white p-5 shadow-sm">
                   <div className="space-y-2">
                     <h3 className="text-lg font-semibold">B. Residency Category</h3>
                   </div>
@@ -550,7 +568,7 @@ export default function SignUpPage() {
                   <div className="space-y-2">
                     <Label htmlFor="residencyCategory">Residency Category *</Label>
                     <Select value={formData.residencyCategory} onValueChange={(value) => handleSelectChange('residencyCategory', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select residency category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -567,7 +585,7 @@ export default function SignUpPage() {
                 </TabsContent>
 
                 {/* Educational Background Tab */}
-                <TabsContent value="education" className="space-y-4 mt-4">
+                <TabsContent value="education" className="mt-4 space-y-4 rounded-xl border bg-white p-5 shadow-sm">
                   <div className="space-y-2">
                     <h3 className="text-lg font-semibold">C. Educational Background</h3>
                   </div>
@@ -575,7 +593,7 @@ export default function SignUpPage() {
                   <div className="space-y-2">
                     <Label htmlFor="educationalAttainment">Highest Educational Attainment *</Label>
                     <Select value={formData.educationalAttainment} onValueChange={(value) => handleSelectChange('educationalAttainment', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select educational attainment" />
                       </SelectTrigger>
                       <SelectContent>
@@ -618,7 +636,7 @@ export default function SignUpPage() {
                 </TabsContent>
 
                 {/* Household Information Tab */}
-                <TabsContent value="household" className="space-y-4 mt-4">
+                <TabsContent value="household" className="mt-4 space-y-4 rounded-xl border bg-white p-5 shadow-sm">
                   <div className="space-y-2">
                     <h3 className="text-lg font-semibold">D. Household Information</h3>
                   </div>
@@ -659,7 +677,7 @@ export default function SignUpPage() {
                         value={formData.isHeadOfFamily ? 'yes' : 'no'} 
                         onValueChange={(value) => setFormData({ ...formData, isHeadOfFamily: value === 'yes' })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -671,7 +689,7 @@ export default function SignUpPage() {
                     <div className="space-y-2">
                       <Label htmlFor="housingType">Housing Type *</Label>
                       <Select value={formData.housingType} onValueChange={(value) => handleSelectChange('housingType', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select housing type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -685,7 +703,7 @@ export default function SignUpPage() {
                 </TabsContent>
 
                 {/* Occupational and Income Information Tab */}
-                <TabsContent value="occupation" className="space-y-4 mt-4">
+                <TabsContent value="occupation" className="mt-4 space-y-4 rounded-xl border bg-white p-5 shadow-sm">
                   <div className="space-y-2">
                     <h3 className="text-lg font-semibold">E. Occupational and Income Information</h3>
                   </div>
@@ -706,7 +724,7 @@ export default function SignUpPage() {
                     <div className="space-y-2">
                       <Label htmlFor="employmentType">Employment Type *</Label>
                       <Select value={formData.employmentType} onValueChange={(value) => handleSelectChange('employmentType', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select employment type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -721,7 +739,7 @@ export default function SignUpPage() {
                     <div className="space-y-2">
                       <Label htmlFor="estimatedAnnualIncome">Estimated Annual Income *</Label>
                       <Select value={formData.estimatedAnnualIncome} onValueChange={(value) => handleSelectChange('estimatedAnnualIncome', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select income range" />
                         </SelectTrigger>
                         <SelectContent>
@@ -741,7 +759,7 @@ export default function SignUpPage() {
                   <div className="space-y-2">
                     <Label htmlFor="maritalStatus">Marital Status *</Label>
                     <Select value={formData.maritalStatus} onValueChange={(value) => handleSelectChange('maritalStatus', value)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select marital status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -755,7 +773,7 @@ export default function SignUpPage() {
                 </TabsContent>
 
                 {/* Documents Tab */}
-                <TabsContent value="documents" className="space-y-4 mt-4">
+                <TabsContent value="documents" className="mt-4 space-y-4 rounded-xl border bg-white p-5 shadow-sm">
                   <div className="space-y-2">
                     <h3 className="text-lg font-semibold">Required Documents</h3>
                     <p className="text-sm text-gray-600">Upload clear photos or scanned copies of the following documents</p>
