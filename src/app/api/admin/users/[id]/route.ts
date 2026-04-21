@@ -185,15 +185,39 @@ export async function PUT(
 
     // Handle barangay manager assignment
     if (role === 'BARANGAY' && validatedBarangayId) {
-      // Set this user as manager of the barangay
-      await prisma.barangay.update({
-        where: { id: validatedBarangayId },
-        data: { managerId: user.id }
+      await prisma.$transaction(async (tx) => {
+        // Ensure one user manages at most one barangay by clearing any previous assignment first.
+        await tx.barangay.updateMany({
+          where: {
+            managerId: user.id,
+            id: { not: validatedBarangayId }
+          },
+          data: { managerId: null }
+        })
+
+        // Prevent overriding another manager on the selected barangay.
+        const targetBarangay = await tx.barangay.findUnique({
+          where: { id: validatedBarangayId },
+          select: { managerId: true }
+        })
+
+        if (!targetBarangay) {
+          throw new Error('Selected barangay does not exist')
+        }
+
+        if (targetBarangay.managerId && targetBarangay.managerId !== user.id) {
+          throw new Error('SELECTED_BARANGAY_HAS_MANAGER')
+        }
+
+        await tx.barangay.update({
+          where: { id: validatedBarangayId },
+          data: { managerId: user.id }
+        })
       })
-    } else if (existingUser.role === 'BARANGAY' && existingUser.barangayId) {
-      // If user was previously a barangay manager, remove them from that barangay
-      await prisma.barangay.update({
-        where: { id: existingUser.barangayId },
+    } else if (existingUser.role === 'BARANGAY') {
+      // If user is no longer a barangay manager, remove any barangay they currently manage.
+      await prisma.barangay.updateMany({
+        where: { managerId: user.id },
         data: { managerId: null }
       })
     }
@@ -215,6 +239,12 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating user:', error)
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    if (error instanceof Error && error.message === 'SELECTED_BARANGAY_HAS_MANAGER') {
+      return NextResponse.json(
+        { error: 'Selected barangay already has a manager assigned' },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
